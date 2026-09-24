@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "PowerShell(markitdown \"C:\\\\Users\\\\iona.li\\\\Downloads\\\\9_24-9_30 ���N�u��.xlsx\")",
+      "PowerShell(python -m markitdown \"C:\\\\Users\\\\iona.li\\\\Downloads\\\\9_24-9_30 ���N�u��.xlsx\")",
+      "PowerShell(python --version 2>&1)"
+    ]
+  }
+}

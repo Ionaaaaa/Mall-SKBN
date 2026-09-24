@@ -1,0 +1,332 @@
+{
+  "_說明": "systemElements 現在只放LOGO（掛標/CTA已改成全站共用固定素材，見configs/shared-elements.js，不用資料庫）。category底下的label是畫面顯示用的中文，key本身是英文方便之後接程式。path是相對這個專案資料夾的路徑，圖檔請放進 system-elements/ 對應分類資料夾，再到這裡補一筆。artwork放商品/曝品的作圖區素材。matchKeys（LOGO用）/matchType（artwork用）是給 js/asset-matcher.js 自動比對Excel工單文字用的，登記常用/檔期限定的固定素材時記得順手補上，不然自動比對只能查brand，比對率會比較低。",
+  "systemElements": {
+    "festival": {
+      "label": "造節",
+      "items": [
+        {
+          "id": "sys_demo_festival_logo",
+          "brand": "示例活動",
+          "name": "示例造節LOGO",
+          "type": "logo",
+          "path": "system-elements/festival/demo-logo.png"
+        },
+        {
+          "id": "new-arrival-ootd_logo",
+          "brand": "新品OOTD",
+          "name": "新品OOTD 造節LOGO",
+          "type": "logo",
+          "path": "system-elements/festival/new-arrival-ootd_logo.png",
+          "matchKeys": [
+            "新品OOTD",
+            "新品 OOTD_LOGO",
+            "OOTD_LOGO"
+          ],
+          "_note": "檔案目前還沒上傳，路徑/檔名先登記好；等圖放進 system-elements/festival/new-arrival-ootd_logo.png 就會自動生效，不用改這份json"
+        },
+        {
+          "id": "shopee-mom-baby-expo_logo",
+          "brand": "蝦皮婦幼展",
+          "name": "蝦皮婦幼展 造節LOGO",
+          "type": "logo",
+          "path": "system-elements/festival/shopee-mom-baby-expo_logo.png",
+          "matchKeys": [
+            "蝦皮婦幼展",
+            "婦幼展"
+          ]
+        },
+        {
+          "id": "sweet-outfit-season_logo",
+          "brand": "甜蜜穿搭季",
+          "name": "甜蜜穿搭季 造節LOGO",
+          "type": "logo",
+          "path": "system-elements/festival/sweet-outfit-season_logo.png",
+          "matchKeys": [
+            "甜蜜穿搭季",
+            "穿搭季"
+          ]
+        }
+      ]
+    },
+    "siteWideSale": {
+      "label": "全站大促",
+      "items": [
+        {
+          "id": "44sale_logo",
+          "brand": "4.4購物節",
+          "name": "4.4購物節 LOGO",
+          "type": "logo",
+          "path": "system-elements/site-wide-sale/44sale_logo.png"
+        },
+        {
+          "id": "memberday18_logo",
+          "brand": "18號會員日",
+          "name": "18號會員日 LOGO",
+          "type": "logo",
+          "path": "system-elements/site-wide-sale/memberday18_logo.png",
+          "presetBgColor": "#ffa200",
+          "presetTextColor": "#ffff3c"
+        },
+        {
+          "id": "1010anniversary_logo",
+          "brand": "10.10品牌週年慶",
+          "name": "10.10品牌週年慶 中間橫版LOGO",
+          "type": "logo",
+          "path": "system-elements/site-wide-sale/1010anniversary_logo.png",
+          "matchKeys": [
+            "10.10品牌週年慶",
+            "10.10品牌週年慶\\01_LOGO",
+            "10.10品牌週年慶/01_LOGO"
+          ],
+          "_note": "檔案目前還沒上傳，路徑/檔名先登記好；等圖放進 system-elements/site-wide-sale/1010anniversary_logo.png 就會自動生效，不用改這份json",
+          "presetBgColor": "#ee4e2e",
+          "presetTextColor": "#fffd3e"
+        },
+        {
+          "id": "mall25festival_logo",
+          "brand": "商城25節",
+          "name": "商城25節 中間橫版LOGO（白字/無USP，每月25號重複使用）",
+          "type": "logo",
+          "path": "system-elements/site-wide-sale/mall25festival_logo.png",
+          "matchKeys": [
+            "商城25節",
+            "01_LOGO\\LOGO_白字_無USP",
+            "01_LOGO/LOGO_白字_無USP"
+          ],
+          "_note": "原本叫「0925」是我從9月那份工單裡「9.25」那一列的LOGO代碼直接照抄命名，誤以為是9月專屬的——實際上是每月25號都會用的固定LOGO(商城25節)，已經改成通用命名，之後不管哪個月的25號都會比對到同一筆。檔案還沒上傳，放進system-elements/site-wide-sale/mall25festival_logo.png就會自動生效。",
+          "presetBgColor": "#d0011d",
+          "presetTextColor": "#ffe600"
+        },
+        {
+          "id": "99brandsale_logo",
+          "brand": "99大促",
+          "name": "99大促 中間橫版LOGO",
+          "type": "logo",
+          "path": "system-elements/site-wide-sale/99brandsale_logo.png",
+          "matchKeys": [
+            "99大促",
+            "9.9品牌週年慶",
+            "99品牌週年慶"
+          ],
+          "presetBgColor": "#ee4e2e",
+          "presetTextColor": "#fffd3e",
+          "_note": "檔案目前還沒上傳，路徑/檔名先登記好；等圖放進 system-elements/site-wide-sale/99brandsale_logo.png 就會自動生效，不用改這份json"
+        },
+        {
+          "id": "618sale_logo",
+          "brand": "618大促",
+          "name": "618全民年中慶 中間橫版LOGO（白字）",
+          "type": "logo",
+          "path": "system-elements/site-wide-sale/618sale_logo.png",
+          "matchKeys": [
+            "618大促",
+            "618全民年中慶",
+            "618大促\\01_LOGO",
+            "618大促/01_LOGO"
+          ]
+        }
+      ]
+    },
+    "common": {
+      "label": "常用建檔",
+      "items": [
+        {
+          "id": "sys_demo_common_logo",
+          "brand": "示例品牌",
+          "name": "示例品牌LOGO",
+          "type": "logo",
+          "path": "system-elements/common/demo-logo.png"
+        },
+        {
+          "id": "shopee-official-store_logo",
+          "brand": "蝦皮直營",
+          "name": "蝦皮直營 LOGO",
+          "type": "logo",
+          "path": "system-elements/common/shopee-official-store_logo.png",
+          "matchKeys": [
+            "蝦皮直營",
+            "Shopee直營"
+          ],
+          "_note": "檔案目前還沒上傳，路徑/檔名先登記好；等圖放進 system-elements/common/shopee-official-store_logo.png 就會自動生效，不用改這份json"
+        },
+        {
+          "id": "limited-time-sale_logo",
+          "brand": "限時特賣",
+          "name": "限時特賣 LOGO",
+          "type": "logo",
+          "path": "system-elements/common/limited-time-sale_logo.png",
+          "matchKeys": [
+            "限時特賣",
+            "限時特賣_LOGO"
+          ],
+          "presetColors": [
+            { "bg": "#fd5401", "text": "#f9ff39" },
+            { "bg": "#084cb1", "text": "#fce700" },
+            { "bg": "#d0011b", "text": "#fce700" }
+          ]
+        },
+        {
+          "id": "watsons_logo",
+          "brand": "屈臣氏",
+          "name": "屈臣氏 Watsons LOGO",
+          "type": "logo",
+          "path": "system-elements/common/watsons_logo.png",
+          "matchKeys": [
+            "屈臣氏",
+            "Watsons"
+          ]
+        }
+      ]
+    }
+  },
+  "artwork": {
+    "siteWideSale": {
+      "label": "全站大促",
+      "items": [
+        {
+          "id": "sitewide_product-coupon-x1",
+          "brand": "全站",
+          "name": "全站優惠券x1",
+          "path": "artwork/site-wide-sale/sitewide_product-coupon-x1.png",
+          "matchType": "全站券*1",
+          "hasText": true
+        },
+        {
+          "id": "mall_product-coupon-x1",
+          "brand": "商城",
+          "name": "商城優惠券x1",
+          "path": "artwork/site-wide-sale/mall_product-coupon-x1.png",
+          "matchType": "商城券*1",
+          "hasText": true
+        },
+        {
+          "id": "mall_product-coupon-x2",
+          "brand": "商城",
+          "name": "商城優惠券x2",
+          "path": "artwork/site-wide-sale/mall_product-coupon-x2.png",
+          "matchType": "商城券*2",
+          "hasText": true
+        },
+        {
+          "id": "mall_free-shipping-cart",
+          "brand": "商城",
+          "name": "免運車",
+          "path": "artwork/site-wide-sale/mall_free-shipping-cart.png",
+          "matchType": "免運車",
+          "hasText": false
+        },
+        {
+          "id": "shopee-coins-pile",
+          "brand": "全站",
+          "name": "蝦幣堆",
+          "path": "artwork/site-wide-sale/shopee-coins-pile.png",
+          "matchType": "蝦幣堆",
+          "hasText": false
+        },
+        {
+          "id": "sitewide_product-coupon-x2",
+          "brand": "全站",
+          "name": "全站優惠券x2",
+          "path": "artwork/site-wide-sale/sitewide_product-coupon-x2.png",
+          "matchType": "全站券*2",
+          "hasText": true
+        },
+        {
+          "id": "sitewide-mall_product-coupon-combo",
+          "brand": "全站+商城",
+          "name": "全站券*1+商城券*1",
+          "path": "artwork/site-wide-sale/sitewide-mall_product-coupon-combo.png",
+          "matchType": "全站券*1+商城券*1",
+          "hasText": true
+        },
+        {
+          "id": "sitewide-coupon_shrimp-coins-combo",
+          "brand": "全站",
+          "name": "全站券*1+蝦幣堆",
+          "path": "artwork/site-wide-sale/sitewide-coupon_shrimp-coins-combo.png",
+          "matchType": "全站券*1+蝦幣堆",
+          "hasText": true
+        },
+        {
+          "id": "mall-coupon_shrimp-coins-combo",
+          "brand": "商城",
+          "name": "商城券*1+蝦幣堆",
+          "path": "artwork/site-wide-sale/mall-coupon_shrimp-coins-combo.png",
+          "matchType": "商城券*1+蝦幣堆",
+          "hasText": true
+        },
+        {
+          "id": "vip-coupon_shrimp-coins-combo",
+          "brand": "VIP",
+          "name": "VIP券*1+蝦幣堆",
+          "path": "artwork/site-wide-sale/vip-coupon_shrimp-coins-combo.png",
+          "matchType": "VIP券*1+蝦幣堆",
+          "hasText": true
+        },
+        {
+          "id": "exclusive_product-coupon-x1",
+          "brand": "直營",
+          "name": "直營優惠券 x1（文字位置見configs/material-text-style.js）",
+          "path": "artwork/site-wide-sale/exclusive_product-coupon-x1.png",
+          "matchType": "直營券*1",
+          "hasText": true
+        },
+        {
+          "id": "vip_product-coupon-x1",
+          "brand": "VIP",
+          "name": "VIP優惠券 x1",
+          "path": "artwork/site-wide-sale/vip_product-coupon-x1.png",
+          "matchType": "VIP券*1",
+          "hasText": true
+        },
+        {
+          "id": "free-shipping-cart_coupon-combo",
+          "brand": "免運",
+          "name": "免運車+免運券*1",
+          "path": "artwork/site-wide-sale/free-shipping-cart_coupon-combo.png",
+          "matchType": "免運車+免運券*1",
+          "hasText": false,
+          "_note": "檔案目前還沒上傳，路徑/檔名先登記好；等圖放進 artwork/site-wide-sale/free-shipping-cart_coupon-combo.png 就會自動生效，不用改這份json"
+        }
+      ]
+    },
+    "common": {
+      "label": "常用建檔",
+      "items": [
+        {
+          "id": "art_demo_common",
+          "brand": "示例品牌",
+          "name": "示例常用商品圖",
+          "path": "artwork/common/demo-product.png"
+        },
+        {
+          "id": "limited-time-sale-yellow",
+          "brand": "限時特賣",
+          "name": "限時特賣-黃",
+          "path": "artwork/common/限時特賣-黃.png",
+          "matchType": "限時特賣-黃",
+          "hasText": false,
+          "presetColor": { "bg": "#fd5401", "text": "#f9ff39" }
+        },
+        {
+          "id": "limited-time-sale-blue",
+          "brand": "限時特賣",
+          "name": "限時特賣-藍",
+          "path": "artwork/common/限時特賣-藍.png",
+          "matchType": "限時特賣-藍",
+          "hasText": false,
+          "presetColor": { "bg": "#084cb1", "text": "#fce700" }
+        },
+        {
+          "id": "limited-time-sale-red",
+          "brand": "限時特賣",
+          "name": "限時特賣-紅",
+          "path": "artwork/common/限時特賣-紅.png",
+          "matchType": "限時特賣-紅",
+          "hasText": false,
+          "presetColor": { "bg": "#d0011b", "text": "#fce700" }
+        }
+      ]
+    }
+  }
+}

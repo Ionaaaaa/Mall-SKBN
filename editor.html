@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<style>
+  /* 真的字型檔（跟krcb專案同一套），檔名要一字不差對到 fonts/ 資料夾裡的
+     實際檔案（含括號），對不上瀏覽器會fallback成系統字體，不會報錯但字會不對。 */
+  @font-face { font-family:'ShopeeNoto'; font-weight:700; src:url('fonts/ShopeeNotoSans(content)-Bold.ttf') format('truetype'); }
+  @font-face { font-family:'ShopeeNoto'; font-weight:500; src:url('fonts/ShopeeNotoSans(content)-Medium.ttf') format('truetype'); }
+  @font-face { font-family:'ShopeeNoto'; font-weight:400; src:url('fonts/ShopeeNotoSans(content)-Regular.ttf') format('truetype'); }
+</style>
+<title>SKBN 左中右・編輯器</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+<div class="topbar">
+  <div class="topbar-left">SKBN 左中右 <span class="badge">・編輯器</span></div>
+  <div class="topbar-right">
+    <input type="file" id="folder-import" webkitdirectory directory multiple style="display:none;">
+    <input type="file" id="excel-import" accept=".xlsx,.xls" style="display:none;">
+    <button class="tbtn" onclick="openImportModal()">
+      <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M8 10V2M5 5l3-3 3 3"/><path d="M2 11v2a1 1 0 001 1h10a1 1 0 001-1v-2"/></svg>
+      匯入工單
+    </button>
+    <input type="file" id="draft-import" accept=".json,.zip" style="display:none;">
+    <button class="tbtn" id="btn-load-draft" title="載入整包下載附的暫存檔（.json，或直接選整包 .zip），還原成當時的內容繼續編輯">載入暫存檔</button>
+    <button class="tbtn" id="btn-download-draft" title="只下載暫存檔（.json），不輸出圖片">下載暫存檔</button>
+    <button class="tbtn primary" id="btn-download-all">整包下載</button>
+    <button class="tbtn" id="btn-reset">重設</button>
+  </div>
+</div>
+
+<div class="layout">
+  <div class="list-panel" id="list-panel"></div>
+  <div id="main"></div>
+  <div class="side-panel" id="side-panel"></div>
+</div>
+
+<!-- 外部函式庫：Excel解析 + Zip打包 -->
+<script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
+
+<!-- 商品陰影引擎（跟你舊專案 pet-frenzy / shopee-home 同一份，沒有改動） -->
+<script src="js/shadow-plugin.js"></script>
+
+<!-- 版型座標（真實量出來的座標，見configs/skbn-layout.js內的說明） -->
+<script src="configs/skbn-layout.js"></script>
+<!-- 掛標/CTA全站共用的白/紅版設定（見configs/shared-elements.js內的說明） -->
+<script src="configs/shared-elements.js"></script>
+<!-- 券樣素材疊字的字級/顏色/位置設定（見configs/material-text-style.js內的說明） -->
+<script src="configs/material-text-style.js"></script>
+
+<!-- 資料 / 資料庫 -->
+<script src="js/editor-state.js"></script>
+<script src="js/asset-library.js"></script>
+
+<!-- 自動比對：這批素材資料夾 + 顏色工具 + 比對引擎（先資料夾、再資料庫、都沒有就警示） -->
+<script src="js/batch-assets.js"></script>
+<script src="js/color-utils.js"></script>
+<script src="js/asset-matcher.js"></script>
+
+<!-- 文案字數/禁用語檢查引擎（跟krcb專案同一套，見js/banwords.js開頭說明） -->
+<script src="js/banwords.js"></script>
+
+<!-- Core -->
+<script src="core/core.js"></script>
+
+<!-- Modules：新增功能＝加一支新檔案，登記進 window.Modules，不用改其他檔案 -->
+<script src="modules/background-module.js"></script>
+<script src="modules/logo-module.js"></script>
+<script src="modules/tag-module.js"></script>
+<script src="modules/cta-module.js"></script>
+<script src="modules/product-module.js"></script>
+<script src="modules/text-module.js"></script>
+
+<!-- 匯入 / 匯出 / 主邏輯 -->
+<script src="js/editor-import.js"></script>
+<script src="js/editor-export.js"></script>
+<script src="js/editor-popups.js"></script>
+<!-- 商品圖去背編輯器（獨立模組，橡皮擦/裁切/自動去背/點選顏色去背；由editor-main.js的「去背」按鈕呼叫） -->
+<script src="js/erase-editor.js"></script>
+<script src="js/editor-main.js"></script>
+
+</body>
+</html>
