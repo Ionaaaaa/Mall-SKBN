@@ -26,6 +26,7 @@ window.SKBN_LAYOUT = {
       ctaZone:    { x:255, y:142, w:79,  h:79 },   // 圓形，w當直徑
       artZone:    { x:11,  y:136, w:336, h:202 },
       tagZone:    { x:11,  y:20,  w:118, h:53 },   // 左邊掛標，你後來補的座標
+      glowEnabled: true, // 左右卡片背景要加圓形光暈（置中在artZone後方），中間版位不用
       titleCharLimit: 6  // 主標文字字數上限，固定值(跟工單表頭「SKBN(左) 6字」一致)，不是工單「字數」欄那個逐列填的參考數字
     },
     mid: {
@@ -37,6 +38,7 @@ window.SKBN_LAYOUT = {
       ctaZone:    { x:737, y:142, w:80,  h:80 },
       artZone:    { x:369, y:136, w:462, h:214 },
       tagZone:    null,
+      glowEnabled: false, // 中間KV不加光暈
       titleCharLimit: 7  // 跟工單表頭「SKBN(中) 7字」一致
     },
     right: {
@@ -47,6 +49,7 @@ window.SKBN_LAYOUT = {
       ctaZone:    { x:1094,y:142, w:79,  h:79 },
       artZone:    { x:850, y:136, w:336, h:202 },
       tagZone:    { x:850, y:20,  w:118, h:53 },   // 目前只有右邊這個組合有掛標，之後有需要再補左/中
+      glowEnabled: true, // 左右卡片背景要加圓形光暈（置中在artZone後方），中間版位不用
       titleCharLimit: 6  // 跟工單表頭「SKBN(右) 6字」一致
     }
   },

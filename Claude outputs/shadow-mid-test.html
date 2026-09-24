@@ -1,0 +1,573 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<title>陰影測試工具（中間角度專用）</title>
+<style>
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; padding: 24px; background: #1b1d22; color: #eee;
+    font-family: -apple-system, "Segoe UI", "PingFang TC", "Microsoft JhengHei", sans-serif;
+    display: flex; gap: 24px; flex-wrap: wrap; align-items: flex-start;
+  }
+  h1 { font-size: 16px; margin: 0 0 4px; }
+  .sub { font-size: 12px; color: #9aa0aa; margin-bottom: 16px; line-height: 1.6; }
+  .stage-wrap { flex: 0 0 auto; }
+  .stage {
+    width: 520px; height: 420px; position: relative; border-radius: 12px; overflow: hidden;
+    background-size: cover; background-position: center; background-color: #f2f2f2;
+    box-shadow: 0 0 0 1px #333;
+  }
+  .stage canvas { position: absolute; left: 0; top: 0; width: 100%; height: 100%; cursor: grab; }
+  .drop-hint {
+    position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+    color: #888; font-size: 13px; pointer-events: none; text-align: center; padding: 20px;
+  }
+  .panel { width: 380px; flex: 0 0 auto; }
+  fieldset { border: 1px solid #383b42; border-radius: 8px; margin-bottom: 14px; padding: 10px 14px 14px; }
+  legend { font-size: 12px; color: #9aa0aa; padding: 0 6px; }
+  .row { display: flex; align-items: center; gap: 8px; margin: 8px 0; font-size: 12px; }
+  .row label { flex: 0 0 128px; color: #ccc; }
+  .row input[type=range] { flex: 1; }
+  .row .val { width: 44px; text-align: right; color: #7fd0ff; font-variant-numeric: tabular-nums; }
+  .angle-btns { display: flex; gap: 8px; }
+  .angle-btns button {
+    flex: 1; padding: 8px 0; border-radius: 6px; border: 1px solid #444; background: #2a2d34;
+    color: #ddd; cursor: pointer; font-size: 13px;
+  }
+  .angle-btns button.active { background: #3a6ff0; border-color: #3a6ff0; color: #fff; }
+  input[type=file] { font-size: 12px; color: #aaa; }
+  input[type=color] { width: 40px; height: 24px; padding: 0; border: none; background: none; cursor: pointer; }
+  .note { font-size: 11px; color: #f0b429; margin: 6px 0 2px; line-height: 1.6; }
+  .values {
+    background: #101114; border: 1px solid #383b42; border-radius: 8px; padding: 10px 14px;
+    font: 12px/1.7 ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace; color: #8ef0a1;
+    white-space: pre-wrap; word-break: break-all;
+  }
+  .toggle-row { display: flex; align-items: center; gap: 8px; margin: 4px 0 10px; font-size: 12px; color: #ccc; }
+</style>
+</head>
+<body>
+
+<div class="stage-wrap">
+  <h1>陰影模糊 / 中間角度測試工具</h1>
+  <div class="sub">
+    這支是照你「shopee-3c-appliance-report」專案裡 js/shadow-system/shadow-plugin.js 的真實演算法原封不動搬過來的（drawGroundShadow那段），不是簡化版。<br>
+    拖你的商品PNG進畫面試試看，右邊調完的數字我再套回真正的shadow-plugin.js。
+  </div>
+  <div class="stage" id="stage">
+    <div class="drop-hint" id="dropHint">把商品去背PNG拖到這裡，或點下面「上傳商品圖」</div>
+  </div>
+</div>
+
+<div class="panel">
+
+  <fieldset>
+    <legend>背景 / 商品</legend>
+    <div class="row"><label>底色</label><input type="color" id="bgColor" value="#f2f2f2"><span class="val" id="bgColorVal">#f2f2f2</span></div>
+    <div class="row"><label>背景圖（選填）</label><input type="file" id="bgImgFile" accept="image/*"></div>
+    <div class="row"><label>商品圖</label><input type="file" id="productFile" accept="image/png,image/webp"></div>
+  </fieldset>
+
+  <fieldset>
+    <legend>光源角度</legend>
+    <div class="angle-btns">
+      <button data-angle="left">左</button>
+      <button data-angle="top" class="active">中</button>
+      <button data-angle="right">右</button>
+    </div>
+  </fieldset>
+
+  <fieldset>
+    <legend>中間角度專用 —— 這是你要調的重點</legend>
+    <div class="note">目前正式版：選「中」時完全不畫主陰影，只留下面接地那一小條，可能就是同事反饋「看不到」的原因。試過直接沿用左右版位的斜切演算法但angle=0時形狀會整團疊在商品正下方、被商品本身完全蓋住，所以改成新做法：拿商品輪廓放大、壓扁、模糊化，變成一片柔和的「陰影窪地」墊在商品下方，邊緣從身形兩側露出來才看得到，沒有方向性。拉到0＝現在正式版的樣子。</div>
+    <div class="row"><label>中間主陰影強度</label><input type="range" id="topMainShadowAlpha" min="0" max="1" step="0.05" value="0.15"><span class="val" id="topMainShadowAlphaVal">0.15</span></div>
+  </fieldset>
+
+  <fieldset>
+    <legend>接地陰影（從「商品碰到地面」那條線，往上下各展開一段）</legend>
+    <div class="row"><label>往上 px</label><input type="range" id="contactUpPx" min="0" max="10" step="1" value="4"><span class="val" id="contactUpPxVal">4</span></div>
+    <div class="row"><label>往下 px</label><input type="range" id="contactDownPx" min="0" max="10" step="1" value="2"><span class="val" id="contactDownPxVal">2</span></div>
+    <div class="row"><label>透明度</label><input type="range" id="contactAlpha" min="0" max="1" step="0.05" value="0.7"><span class="val" id="contactAlphaVal">0.7</span></div>
+    <div class="row"><label>左右橫向模糊</label><input type="range" id="contactBlurX" min="0" max="20" step="1" value="3"><span class="val" id="contactBlurXVal">3</span></div>
+    <div class="note" style="margin-top:2px;">陰影畫在商品照片「之前」（在商品後面），「往上」那段主要會透過商品邊緣的羽化像素露出一點點接地暗邊；「往下」是原本那條貼合輪廓的細線。兩段拼成一條，一起套左右橫向模糊，接縫處不會看到硬邊。永遠焊死在商品本體上，跟主陰影的位移/角度無關。</div>
+  </fieldset>
+
+  <fieldset>
+    <legend>主陰影柔化（左/右角度＋上面的中間主陰影強度都吃這組）</legend>
+    <div class="row"><label>soft 柔化半徑</label><input type="range" id="soft" min="4" max="40" step="1" value="11"><span class="val" id="softVal">11</span></div>
+    <div class="row"><label>fade 淡出強度</label><input type="range" id="fade" min="60" max="200" step="1" value="60"><span class="val" id="fadeVal">60</span></div>
+    <div class="row"><label>occlude 遮擋強度</label><input type="range" id="occlude" min="0" max="150" step="1" value="34"><span class="val" id="occludeVal">34</span></div>
+    <div class="row"><label>squash 壓扁比例</label><input type="range" id="squash" min="0.1" max="0.6" step="0.01" value="0.36"><span class="val" id="squashVal">0.36</span></div>
+  </fieldset>
+
+  <fieldset>
+    <legend>尾端模糊（2026-09新增的那組）</legend>
+    <div class="row"><label>tailBlur</label><input type="range" id="tailBlur" min="0" max="40" step="1" value="12"><span class="val" id="tailBlurVal">12</span></div>
+    <div class="row"><label>tailBlurStart</label><input type="range" id="tailBlurStart" min="0" max="0.9" step="0.01" value="0.51"><span class="val" id="tailBlurStartVal">0.51</span></div>
+    <div class="row"><label>tailBlurSpan</label><input type="range" id="tailBlurSpan" min="0.05" max="0.9" step="0.01" value="0.54"><span class="val" id="tailBlurSpanVal">0.54</span></div>
+    <div class="row"><label>tailMid</label><input type="range" id="tailMid" min="0" max="1" step="0.01" value="0.34"><span class="val" id="tailMidVal">0.34</span></div>
+    <div class="row"><label>tailMidAlpha</label><input type="range" id="tailMidAlpha" min="0" max="1" step="0.01" value="0.88"><span class="val" id="tailMidAlphaVal">0.88</span></div>
+  </fieldset>
+
+  <fieldset>
+    <legend>陰影顏色</legend>
+    <div class="row"><label>固定顏色</label><input type="color" id="shadowColor" value="#5a5a5a"><span class="val" id="shadowColorVal">90,90,90</span></div>
+  </fieldset>
+
+  <div class="values" id="values"></div>
+</div>
+
+<script>
+'use strict';
+/* ===================== 以下 drawGroundShadow 相關程式碼，照你專案 ===================== */
+var FIXED = { soft:11, fade:60, occlude:34, squash:0.36, tailMid:0.34, tailMidAlpha:0.88, tailBlur:12, tailBlurStart:0.51, tailBlurSpan:0.54,
+  contactUpPx:4, contactDownPx:2, contactAlpha:0.7, contactBlurX:3, topMainShadowAlpha:0.15 };
+var ANGLE_PRESETS = { left:-35, top:0, right:35 };
+var opts = { angle: ANGLE_PRESETS.top, presetName:'top' };
+var shadowRGB = '90,90,90';
+
+function setAngle(preset){
+  if(typeof preset === 'number'){ opts.angle = preset; opts.presetName = null; return; }
+  if(ANGLE_PRESETS[preset] != null){ opts.angle = ANGLE_PRESETS[preset]; opts.presetName = preset; }
+}
+
+function buildSilhouette(img){
+  var c = document.createElement('canvas');
+  c.width = img.naturalWidth; c.height = img.naturalHeight;
+  var ctx = c.getContext('2d');
+  ctx.drawImage(img, 0, 0);
+  ctx.globalCompositeOperation = 'source-in';
+  ctx.fillStyle = '#000000';
+  ctx.fillRect(0, 0, c.width, c.height);
+  return c;
+}
+function tintProduct(p){
+  if(!p || !p.silhouette) return;
+  var tinted = document.createElement('canvas');
+  tinted.width = p.silhouette.width; tinted.height = p.silhouette.height;
+  var tctx = tinted.getContext('2d');
+  tctx.drawImage(p.silhouette, 0, 0);
+  tctx.globalCompositeOperation = 'source-in';
+  tctx.fillStyle = 'rgb(' + shadowRGB + ')';
+  tctx.fillRect(0, 0, tinted.width, tinted.height);
+  p.tinted = tinted;
+}
+function detectAlphaTrim(img){
+  var c = document.createElement('canvas');
+  var maxDim = 300;
+  var scale = Math.min(1, maxDim / Math.max(img.naturalWidth, img.naturalHeight));
+  var w = Math.max(1, Math.round(img.naturalWidth * scale));
+  var h = Math.max(1, Math.round(img.naturalHeight * scale));
+  c.width = w; c.height = h;
+  var cctx = c.getContext('2d');
+  cctx.drawImage(img, 0, 0, w, h);
+  var top=0, bottom=0, left=0, right=0;
+  try{
+    var d = cctx.getImageData(0, 0, w, h).data;
+    var minY=h, maxY=-1, minX=w, maxX=-1, alphaThresh=10;
+    for(var y=0;y<h;y++){
+      for(var x=0;x<w;x++){
+        var a = d[(y*w+x)*4+3];
+        if(a > alphaThresh){
+          if(y<minY) minY=y; if(y>maxY) maxY=y;
+          if(x<minX) minX=x; if(x>maxX) maxX=x;
+        }
+      }
+    }
+    if(maxY>=0){ top=minY/h; bottom=(h-1-maxY)/h; left=minX/w; right=(w-1-maxX)/w; }
+  }catch(e){}
+  return { top:top, bottom:bottom, left:left, right:right };
+}
+function stampLayer(targetCtx, tinted, ox, oy, pw, ph, shear, squash, spread, totalAlpha, samples){
+  if(!tinted) return;
+  targetCtx.save();
+  targetCtx.globalCompositeOperation = 'multiply';
+  targetCtx.globalAlpha = totalAlpha / samples;
+  for(var i=0;i<samples;i++){
+    var ang = (i/samples) * Math.PI * 2 * 2.4;
+    var rad = spread * Math.sqrt((i+0.5)/samples);
+    var dx = Math.cos(ang)*rad;
+    var dy = Math.sin(ang)*rad*0.4;
+    targetCtx.save();
+    targetCtx.translate(ox+dx, oy+dy);
+    targetCtx.transform(1, 0, shear, squash, 0, 0);
+    targetCtx.drawImage(tinted, -pw/2, -ph, pw, ph);
+    targetCtx.restore();
+  }
+  targetCtx.restore();
+}
+
+var _contactTmp = null;
+function getContactTmp(w, h){
+  if(!_contactTmp) _contactTmp = document.createElement('canvas');
+  if(_contactTmp.width !== w || _contactTmp.height !== h){ _contactTmp.width=w; _contactTmp.height=h; }
+  else _contactTmp.getContext('2d').clearRect(0,0,w,h);
+  return _contactTmp;
+}
+
+/* 只讓「這一塊」左右暈開、垂直方向(厚度/跟商品的距離)完全不變的模糊法：
+   canvas的filter:blur()本身是上下左右等比例模糊的，沒辦法只挑一個方向。
+   做法是先把來源畫面「垂直拉高很多倍」貼到一張暫存canvas上，這時候同一個
+   blur(px)套上去，因為畫面被拉高了，等比例模糊在「拉高後的垂直方向」上
+   造成的視覺模糊幅度會被稀釋到幾乎看不出來，但水平方向沒被拉伸、模糊幅度
+   不變──等於變相做出「只有水平方向在暈」的效果，再把畫面壓回原本高度
+   貼回去就好，跟接地陰影完全獨立，不會動到上面「主陰影柔化」那組。 */
+function blurHorizontalOnly(srcCanvas, radiusPx){
+  if(radiusPx <= 0) return srcCanvas;
+  var STRETCH = 14;
+  var w = srcCanvas.width, h = srcCanvas.height;
+  var tall = document.createElement('canvas');
+  tall.width = w; tall.height = h * STRETCH;
+  var tctx = tall.getContext('2d');
+  tctx.imageSmoothingEnabled = false;
+  tctx.drawImage(srcCanvas, 0, 0, w, h, 0, 0, w, h * STRETCH);
+
+  var blurred = document.createElement('canvas');
+  blurred.width = w; blurred.height = h * STRETCH;
+  var bctx = blurred.getContext('2d');
+  bctx.filter = 'blur(' + radiusPx + 'px)';
+  bctx.drawImage(tall, 0, 0);
+  bctx.filter = 'none';
+
+  var out = document.createElement('canvas');
+  out.width = w; out.height = h;
+  var octx = out.getContext('2d');
+  octx.imageSmoothingEnabled = false;
+  octx.drawImage(blurred, 0, 0, w, h * STRETCH, 0, 0, w, h);
+  return out;
+}
+
+/* 跟你專案的drawGroundShadow一致，唯二差異都標了註解：
+   1. 接地補強陰影的 2px / 0.55 改成吃 FIXED.contactPx / FIXED.contactAlpha（原本是寫死的）
+   2. 「中」角度原本整段跳過主陰影，這裡改成看 FIXED.topMainShadowAlpha，
+      >0 時一樣用angle=0（不會有左右斜切）畫一份主陰影，疊加時的整體透明度
+      再乘上這個強度——這是新加的實驗開關，拉到0跟現在正式版行為完全一樣。 */
+function drawGroundShadow(ctx, p, state){
+  if(!p || !p.tinted) return;
+  var pw = state.w, ph = state.h;
+  var cx = state.x;
+  var squash = FIXED.squash;
+  var trimBottomPad = p.trim ? p.trim.bottom * ph : 0;
+  var py = state.y + trimBottomPad;
+  var shadowGroundY = state.y + trimBottomPad * squash;
+  var trimCenterOffsetX = p.trim ? (p.trim.left - p.trim.right) * pw / 2 : 0;
+  var shadowCx = cx + trimCenterOffsetX;
+
+  var isTop = (opts.presetName === 'top');
+
+  /* 中間角度：試過直接沿用「shear=0的主陰影演算法」發現完全沒用——angle=0時
+     shear=0，陰影跟商品輪廓同寬、沒有左右位移，形狀會整團疊在商品正下方，
+     幾乎100%被商品照片本身蓋住(商品最後畫在最上層)，不管透明度調多高畫面
+     都看不出差別。改成一個新做法：拿商品輪廓本身，放大一點、垂直壓扁、
+     模糊化，當一整片柔和的「陰影窪地」畫在商品正下方——因為刻意放大過，
+     邊緣會從商品身形兩側/下方露出來，才會真的看得到，且沒有方向性(不是
+     左右斜切，純粹加強存在感)。 */
+  if(isTop){
+    if(FIXED.topMainShadowAlpha > 0){
+      var haloW = pw * 1.28;
+      var haloH = ph * FIXED.squash * 1.7;
+      var blurPx = Math.max(2, FIXED.soft * 1.1);
+      var htmp = document.createElement('canvas');
+      htmp.width = ctx.canvas.width; htmp.height = ctx.canvas.height;
+      var hctx = htmp.getContext('2d');
+      hctx.filter = 'blur(' + blurPx + 'px)';
+      hctx.drawImage(p.tinted, shadowCx - haloW/2, shadowGroundY - haloH, haloW, haloH);
+      hctx.filter = 'none';
+      ctx.save();
+      ctx.globalCompositeOperation = 'multiply';
+      ctx.globalAlpha = FIXED.topMainShadowAlpha;
+      ctx.drawImage(htmp, 0, 0);
+      ctx.restore();
+    }
+  } else {
+    var angle = opts.angle * Math.PI / 180;
+    var soft = FIXED.soft;
+    var fadeMul = FIXED.fade / 100;
+    var occludeStrength = FIXED.occlude / 100;
+    var shear = Math.tan(angle * 0.55);
+    var maxSpread = soft * 1.8;
+
+    var halfW = pw/2 + Math.abs(shear)*ph + maxSpread*2 + 20;
+    var tempW = Math.ceil(halfW*2);
+    var tempH = Math.ceil(ph*squash*2 + maxSpread*2 + 40);
+    var anchorX = halfW;
+    var anchorY = Math.ceil(tempH*0.5);
+
+    var tmp = document.createElement('canvas');
+    tmp.width = tempW; tmp.height = tempH;
+    var tctx = tmp.getContext('2d');
+
+    stampLayer(tctx, p.tinted, anchorX, anchorY, pw, ph, shear, squash, soft*1.8, 0.28, 12);
+    stampLayer(tctx, p.tinted, anchorX, anchorY, pw, ph, shear, squash, soft*0.8, 0.4, 10);
+    stampLayer(tctx, p.tinted, anchorX, anchorY, pw, ph, shear, squash, soft*0.25, 0.35, 6);
+
+    var tipX = -shear*ph*fadeMul;
+    var tipY = -squash*ph*fadeMul - soft*0.6;
+
+    if(FIXED.tailBlur > 0){
+      var bs = Math.max(0, Math.min(0.9, FIXED.tailBlurStart));
+      var be = Math.min(1, bs + Math.max(0.05, FIXED.tailBlurSpan));
+      var blurred = document.createElement('canvas');
+      blurred.width = tempW; blurred.height = tempH;
+      var bctx = blurred.getContext('2d');
+      bctx.filter = 'blur(' + FIXED.tailBlur + 'px)';
+      bctx.drawImage(tmp, 0, 0);
+      bctx.filter = 'none';
+      var gb = bctx.createLinearGradient(anchorX, anchorY, anchorX+tipX, anchorY+tipY);
+      gb.addColorStop(0, 'rgba(255,255,255,0)');
+      gb.addColorStop(bs, 'rgba(255,255,255,0)');
+      gb.addColorStop(be, 'rgba(255,255,255,1)');
+      gb.addColorStop(1, 'rgba(255,255,255,1)');
+      bctx.globalCompositeOperation = 'destination-in';
+      bctx.fillStyle = gb; bctx.fillRect(0,0,tempW,tempH);
+      var gs = tctx.createLinearGradient(anchorX, anchorY, anchorX+tipX, anchorY+tipY);
+      gs.addColorStop(0, 'rgba(255,255,255,1)');
+      gs.addColorStop(bs, 'rgba(255,255,255,1)');
+      gs.addColorStop(be, 'rgba(255,255,255,0)');
+      gs.addColorStop(1, 'rgba(255,255,255,0)');
+      tctx.globalCompositeOperation = 'destination-in';
+      tctx.fillStyle = gs; tctx.fillRect(0,0,tempW,tempH);
+      tctx.globalCompositeOperation = 'lighter';
+      tctx.drawImage(blurred, 0, 0);
+      tctx.globalCompositeOperation = 'destination-in';
+      var gf = tctx.createLinearGradient(0, anchorY-2, 0, anchorY+5);
+      gf.addColorStop(0, 'rgba(255,255,255,1)');
+      gf.addColorStop(1, 'rgba(255,255,255,0)');
+      tctx.fillStyle = gf; tctx.fillRect(0,0,tempW,tempH);
+      tctx.globalCompositeOperation = 'source-over';
+    }
+    tctx.globalCompositeOperation = 'destination-in';
+    var grad = tctx.createLinearGradient(anchorX, anchorY, anchorX+tipX, anchorY+tipY);
+    grad.addColorStop(0, 'rgba(255,255,255,1)');
+    grad.addColorStop(FIXED.tailMid, 'rgba(255,255,255,' + FIXED.tailMidAlpha + ')');
+    grad.addColorStop(1, 'rgba(255,255,255,0)');
+    tctx.fillStyle = grad;
+    tctx.fillRect(0,0,tempW,tempH);
+    tctx.globalCompositeOperation = 'source-over';
+
+    ctx.save();
+    ctx.beginPath();
+    var clipMarginBelow = 5;
+    var clipSpanX = ctx.canvas.width * 3;
+    ctx.rect(shadowCx - clipSpanX, shadowGroundY - clipSpanX, clipSpanX*2, clipSpanX + clipMarginBelow);
+    ctx.clip();
+    ctx.globalCompositeOperation = 'multiply';
+    ctx.drawImage(tmp, shadowCx - anchorX, shadowGroundY - anchorY);
+    ctx.restore();
+  }
+
+  /* 接地陰影：從「商品碰到地面」那條線開始，往上3px、往下3px，共6px，不是
+     只有下面一段。
+     ⚠ 2026-09修正：你反饋「陰影跑到商品前面去了」——上一版我為了讓「往上」
+     那半段在商品自己的實心區域也看得出變暗，把這段畫在商品照片之後、用
+     multiply疊上去，結果看起來像是陰影蓋在商品上面(前景)，不對。
+     改回跟主陰影同一種邏輯：畫在商品照片之前，商品是不透明的部分畫上去
+     後會直接蓋掉「往上」那一段——這樣才正確，陰影本來就該在商品後面，
+     不該讓人感覺陰影疊在商品表面上。只有商品輪廓邊緣本身是半透明的
+     羽化像素(PNG去背常見)，才會透出一點點這段陰影，形成很自然的接地
+     暗邊，不會是一大塊蓋在商品身上的色塊。「往下」那半段本來就在商品
+     範圍外，效果不受影響。
+     做法：往下那一半沿用原本「位移+挖空」的技巧，讓形狀貼合商品輪廓
+     （不是死板一條直線）；往上那一半直接用商品自己的輪廓剪裁出最下面
+     那一小段；兩段拼起來後再整體套一次「只有左右方向」的模糊，邊界才
+     不會有一條硬接縫。永遠焊死在商品本體上——不吃主陰影的
+     shadowOffsetX/Y、不吃光源角度，商品在編輯器裡怎麼拖，這一整段就跟著
+     怎麼走。 */
+  var upPx = FIXED.contactUpPx, downPx = FIXED.contactDownPx;
+  if((upPx > 0 || downPx > 0) && FIXED.contactAlpha > 0){
+    /* ⚠ py 不是商品「視覺上」碰到地面的那條線——py是連同PNG底部透明留白
+       一起算的完整方框底邊，真正碰地的輪廓邊緣其實在 py 往上 trimBottomPad
+       那麼多px的地方（也就是groundY，剛好等於呼叫端傳進來的 state.y）。
+       一開始直接拿py當基準，結果整段畫到留白裡面去了、完全看不到
+       （PNG留白比例愈大的商品，這個誤差愈明顯）——這裡改成用groundY，
+       商品本體的輪廓形狀才會準確對到接地線上。 */
+    var groundY = py - trimBottomPad;
+    var bw = Math.ceil(pw) + 2, bh = Math.ceil(upPx + downPx) + 2;
+    var imgYInTemp = trimBottomPad - ph + upPx; // p.tinted畫在temp canvas裡的y位置，讓輪廓真正的接地邊緣對齊temp的第upPx列
+
+    // 往上那一半：商品自己的輪廓，剪裁只留最下面 upPx 那一條
+    var aboveCanvas = document.createElement('canvas');
+    aboveCanvas.width = bw; aboveCanvas.height = bh;
+    var actx = aboveCanvas.getContext('2d');
+    if(upPx > 0){
+      actx.save();
+      actx.beginPath();
+      actx.rect(0, 0, bw, upPx);
+      actx.clip();
+      actx.drawImage(p.tinted, 0, imgYInTemp, pw, ph);
+      actx.restore();
+    }
+
+    // 往下那一半：原本「位移+挖空」技巧，貼合輪廓、不是死板矩形
+    var belowCanvas = document.createElement('canvas');
+    belowCanvas.width = bw; belowCanvas.height = bh;
+    var bctx2 = belowCanvas.getContext('2d');
+    if(downPx > 0){
+      bctx2.globalCompositeOperation = 'source-over';
+      bctx2.drawImage(p.tinted, 0, imgYInTemp + downPx, pw, ph);
+      bctx2.globalCompositeOperation = 'destination-out';
+      bctx2.drawImage(p.tinted, 0, imgYInTemp, pw, ph);
+      bctx2.globalCompositeOperation = 'source-over';
+    }
+
+    var combined = document.createElement('canvas');
+    combined.width = bw; combined.height = bh;
+    var comCtx = combined.getContext('2d');
+    comCtx.drawImage(aboveCanvas, 0, 0);
+    comCtx.drawImage(belowCanvas, 0, 0);
+
+    var combinedBlurred = blurHorizontalOnly(combined, FIXED.contactBlurX);
+    ctx.save();
+    ctx.globalCompositeOperation = 'multiply';
+    ctx.globalAlpha = FIXED.contactAlpha;
+    ctx.drawImage(combinedBlurred, cx - pw/2, (groundY - upPx));
+    ctx.restore();
+  }
+
+  ctx.drawImage(p.img, cx - pw/2, py - ph, pw, ph);
+}
+/* ===================== drawGroundShadow 相關程式碼結束 ===================== */
+
+var stage = document.getElementById('stage');
+var dropHint = document.getElementById('dropHint');
+var canvas = document.createElement('canvas');
+var STAGE_W = 520, STAGE_H = 420;
+canvas.width = STAGE_W; canvas.height = STAGE_H;
+stage.appendChild(canvas);
+var ctx = canvas.getContext('2d');
+
+var currentProduct = null; // { img, silhouette, tinted, trim }
+var state = { x: STAGE_W*0.42, y: STAGE_H*0.78, w: 220, h: 220 };
+var drag = null;
+
+function redraw(){
+  ctx.clearRect(0,0,STAGE_W,STAGE_H);
+  if(currentProduct){
+    drawGroundShadow(ctx, currentProduct, state);
+    dropHint.style.display = 'none';
+  } else {
+    dropHint.style.display = 'flex';
+  }
+  updateValuesPanel();
+}
+
+function loadProductFromFile(file){
+  var url = URL.createObjectURL(file);
+  var img = new Image();
+  img.onload = function(){
+    var silhouette = buildSilhouette(img);
+    var trim = detectAlphaTrim(img);
+    currentProduct = { img: img, silhouette: silhouette, tinted: null, trim: trim };
+    tintProduct(currentProduct);
+    var scale = Math.min(240/img.naturalWidth, 260/img.naturalHeight, 1);
+    state.w = img.naturalWidth * scale;
+    state.h = img.naturalHeight * scale;
+    state.x = STAGE_W*0.42;
+    state.y = STAGE_H*0.8;
+    redraw();
+  };
+  img.src = url;
+}
+
+document.getElementById('productFile').addEventListener('change', function(e){
+  if(e.target.files[0]) loadProductFromFile(e.target.files[0]);
+});
+stage.addEventListener('dragover', function(e){ e.preventDefault(); });
+stage.addEventListener('drop', function(e){
+  e.preventDefault();
+  var f = e.dataTransfer.files[0];
+  if(f) loadProductFromFile(f);
+});
+
+document.getElementById('bgColor').addEventListener('input', function(e){
+  stage.style.backgroundImage = 'none';
+  stage.style.backgroundColor = e.target.value;
+  document.getElementById('bgColorVal').textContent = e.target.value;
+});
+document.getElementById('bgImgFile').addEventListener('change', function(e){
+  var f = e.target.files[0];
+  if(!f) return;
+  var url = URL.createObjectURL(f);
+  stage.style.backgroundImage = 'url(' + url + ')';
+});
+
+document.getElementById('shadowColor').addEventListener('input', function(e){
+  var hex = e.target.value.replace('#','');
+  var r = parseInt(hex.substr(0,2),16), g = parseInt(hex.substr(2,2),16), b = parseInt(hex.substr(4,2),16);
+  shadowRGB = r+','+g+','+b;
+  document.getElementById('shadowColorVal').textContent = shadowRGB;
+  if(currentProduct){ tintProduct(currentProduct); redraw(); }
+});
+
+// 光源角度按鈕
+document.querySelectorAll('.angle-btns button').forEach(function(btn){
+  btn.addEventListener('click', function(){
+    document.querySelectorAll('.angle-btns button').forEach(function(b){ b.classList.remove('active'); });
+    btn.classList.add('active');
+    setAngle(btn.dataset.angle);
+    redraw();
+  });
+});
+
+// 所有滑桿統一綁定
+var sliderIds = ['topMainShadowAlpha','contactUpPx','contactDownPx','contactAlpha','contactBlurX','soft','fade','occlude','squash','tailBlur','tailBlurStart','tailBlurSpan','tailMid','tailMidAlpha'];
+sliderIds.forEach(function(id){
+  var el = document.getElementById(id);
+  var out = document.getElementById(id+'Val');
+  el.addEventListener('input', function(){
+    FIXED[id] = parseFloat(el.value);
+    out.textContent = el.value;
+    redraw();
+  });
+});
+
+// 拖曳商品調整位置
+canvas.addEventListener('pointerdown', function(e){
+  var r = canvas.getBoundingClientRect();
+  var mx = (e.clientX - r.left) * (STAGE_W/r.width);
+  var my = (e.clientY - r.top) * (STAGE_H/r.height);
+  drag = { dx: mx - state.x, dy: my - state.y };
+  canvas.style.cursor = 'grabbing';
+});
+window.addEventListener('pointermove', function(e){
+  if(!drag) return;
+  var r = canvas.getBoundingClientRect();
+  var mx = (e.clientX - r.left) * (STAGE_W/r.width);
+  var my = (e.clientY - r.top) * (STAGE_H/r.height);
+  state.x = mx - drag.dx;
+  state.y = my - drag.dy;
+  redraw();
+});
+window.addEventListener('pointerup', function(){ drag = null; canvas.style.cursor = 'grab'; });
+
+function updateValuesPanel(){
+  var angleLabel = opts.presetName || (opts.angle + '度');
+  var lines = [
+    '// 目前光源角度: ' + angleLabel,
+    '// 陰影色 shadowRGB: ' + shadowRGB,
+    '',
+    'FIXED = {',
+    '  soft: ' + FIXED.soft + ',',
+    '  fade: ' + FIXED.fade + ',',
+    '  occlude: ' + FIXED.occlude + ',',
+    '  squash: ' + FIXED.squash + ',',
+    '  tailMid: ' + FIXED.tailMid + ',',
+    '  tailMidAlpha: ' + FIXED.tailMidAlpha + ',',
+    '  tailBlur: ' + FIXED.tailBlur + ',',
+    '  tailBlurStart: ' + FIXED.tailBlurStart + ',',
+    '  tailBlurSpan: ' + FIXED.tailBlurSpan,
+    '}',
+    '',
+    '接地陰影: contactUpPx=' + FIXED.contactUpPx + ', contactDownPx=' + FIXED.contactDownPx + ', contactAlpha=' + FIXED.contactAlpha + ', contactBlurX=' + FIXED.contactBlurX,
+    '中間角度主陰影強度(topMainShadowAlpha): ' + FIXED.topMainShadowAlpha + (FIXED.topMainShadowAlpha===0 ? '　← 0＝跟現在正式版一樣' : '')
+  ];
+  document.getElementById('values').textContent = lines.join('\n');
+}
+
+window.__ready = false;
+setTimeout(function(){ window.__ready = true; }, 300);
+redraw();
+</script>
+</body>
+</html>

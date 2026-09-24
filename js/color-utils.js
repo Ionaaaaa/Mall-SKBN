@@ -149,12 +149,44 @@ var ColorUtils = (function(){
     return (productColor.s >= logoColor.s) ? productColor : logoColor;
   }
 
+  /* 左右卡片背景「光暈」專用：同色相、同飽和度，只把明度往白色推一段比例k
+     （k=0不變，k=1推到全白）。這套公式是跟你核可的光暈色 #ff5c6f 反推回來
+     的（底色 #d0011b、H≈353°/S≈100%幾乎沒變，只有L從41%推到68%，比例約
+     0.46），所以拿掉hue/飽和度的調整，只調明度，同一套公式可以套用在任何
+     底色（不用為每個底色寫死一個光暈色）。k預設0.45，跟background-module.js
+     的GLOW.k保持一致（那邊是實際套用光暈時真正用的數字，這裡預設值只是
+     給沒特別指定k時的保險）。 */
+  function lightenForGlow(hex, k){
+    if(k == null) k = 0.45;
+    var hsl = hexToHsl(hex);
+    var l2 = hsl.l + (100 - hsl.l) * k;
+    return hslToHex(hsl.h, hsl.s, l2);
+  }
+
+  /* 商品陰影色專用：跟lightenForGlow反方向，同色相、同飽和度，只把明度
+     往黑色壓一段比例k（k=0不變，k=1壓到全黑）。這套公式最早是跟你在
+     skbn-shadow-test.html調出來、核可的陰影色 #940016 反推回來的
+     （底色 #d0011b，H≈352°/S≈99%幾乎沒變，只有L從41%壓到29%，比例約
+     0.29），拿掉hue/飽和度的調整，只調明度，同一套公式可以套用在
+     任何底色（不用為每張卡片寫死一個陰影色，底色換了陰影色自動跟著算）。
+     2026-09再調深一次：你反饋套用新的soft/fade/occlude數字後陰影顏色
+     看起來太淺，改成k=0.4（壓暗比例從29%提高到40%），同色相/飽和度
+     不變，用法對稱lightenForGlow的k（GLOW.k）。 */
+  function darkenForShadow(hex, k){
+    if(k == null) k = 0.4;
+    var hsl = hexToHsl(hex);
+    var l2 = hsl.l * (1 - k);
+    return hslToHex(hsl.h, hsl.s, l2);
+  }
+
   return {
     hexToRgb: hexToRgb, rgbToHex: rgbToHex,
     rgbToHsl: rgbToHsl, hslToRgb: hslToRgb, hslToHex: hslToHex, hexToHsl: hexToHsl,
     sampleDominantColor: sampleDominantColor,
     pickContrastingBackground: pickContrastingBackground,
     pickTextColorForBackground: pickTextColorForBackground,
-    pickDominantOf: pickDominantOf
+    pickDominantOf: pickDominantOf,
+    lightenForGlow: lightenForGlow,
+    darkenForShadow: darkenForShadow
   };
 })();

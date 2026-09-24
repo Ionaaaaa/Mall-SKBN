@@ -194,8 +194,10 @@ function resolveSlot(slot, banner, bannerIdx, key, warnings){
         // 只有從「這批素材資料夾」比對到的一般品牌LOGO才需要自動裁切+白底
         // （原始上傳照片通常有雜亂留白/沒去背，需要處理）。從資料庫比對到
         // 的是已經做好的固定素材(造節/大促/常用建檔)，本來就是正確的樣子，
-        // 直接呈現原圖就好，不用再裁切。
-        slot.logoMode = (logoResult.source === 'batch') ? 'trim' : 'original';
+        // 直接呈現原圖就好，不用再裁切——除非資料庫裡這筆特別登記了
+        // forceTrimMode:true(例如品牌會員，圖檔比例跟LOGO框不一樣，需要
+        // 裁切+底色的膠囊模式包起來)，這種即使是資料庫比對到的也要用trim。
+        slot.logoMode = (logoResult.source === 'batch' || logoResult.forceTrimMode) ? 'trim' : 'original';
         Modules.logo.applyProcessing(slot, next);
       } else {
         next();
@@ -211,6 +213,10 @@ function resolveSlot(slot, banner, bannerIdx, key, warnings){
           slot.productSrc = materialResult.src;
           slot.shadowAngle = 'off'; // 素材/券圖不加陰影
           slot.materialType = slot._importMaterialType || null;
+          // 記在slot上（不只是applyAutoBackground用完就丟），這樣之後打開放大
+          // 編輯視窗，色票列也會看到這個素材的專屬色票（跟LOGO的presetColors
+          // 是同一套機制，見editor-main.js的getSlotPresets/syncMaterialPresets）。
+          slot.materialPresetColor = materialResult.presetColor || null;
           if(materialResult.hasText){
             // 跟popup裡切換券樣同一個道理：要照這個種類實際有幾個文字框，
             // 塞進對應數量「各自獨立」的初始文字，不要只塞一個然後讓其他

@@ -21,17 +21,15 @@ window.ShadowPlugin = (function () {
   // 做法)、「中」角度的柔霧主陰影(topMainShadowAlpha)、以及接地陰影改成「碰地線上下
   // 各展開一段+左右橫向模糊」，都是你在模擬器上調出來的。
   var FIXED = {
-    // 2026-09你在skbn-shadow-test.html上重新校過、直接給我的完整數值（斜射主陰影
-    // 這組+接地陰影+中角度主陰影強度），中間我自己試著把tailBlur往下調想解決
-    // 「糊到看不到」的問題，但你確認過那個問題其實不是斜射陰影的tailBlur造成的，
-    // 這裡整組改回你這次給的原始數值，不要再自己降tailBlur。
+    // 2026-09再微調一次（同一顆skbn-shadow-test.html模擬器）：soft/fade/occlude/squash
+    // 這組再調過一輪
     soft: 4,
     fade: 82,
     occlude: 0,
     squash: 0.41,
     // 尾端模糊：根部維持清楚邊緣，越往尾端越換成模糊版本，避免商品輪廓頂端留下一條銳利硬邊
     tailMid: 0.34,
-    tailMidAlpha: 0.68,
+    tailMidAlpha: 1,
     tailBlur: 17,
     tailBlurStart: 0.27,
     tailBlurSpan: 0.36,
@@ -41,10 +39,11 @@ window.ShadowPlugin = (function () {
     topMainShadowAlpha: 0.15,
     // 接地陰影：從商品實際碰到地面那條線，往上(疊在商品自己底部)、往下(貼合輪廓的細線)
     // 各展開一段，兩段拼成一條再套左右橫向模糊，做法跟舊版CONTACT_GROW_PX/0.55完全不同
-    contactUpPx: 4,
-    contactDownPx: 2,
+    // 2026-09再調整：往上/往下改成對稱各3px（原本4/2），橫向模糊也加大一點
+    contactUpPx: 3,
+    contactDownPx: 3,
     contactAlpha: 0.7,
-    contactBlurX: 3
+    contactBlurX: 5
   };
   var ANGLE_PRESETS = { left: -35, top: 0, right: 35 };
 

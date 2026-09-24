@@ -48,7 +48,7 @@ var Core = (function(){
     var onSelectProduct = hooks.onSelectProduct || function(){};
     var onSelectTag = hooks.onSelectTag || function(){};
 
-    Modules.background.buildDom(el, slot, cfg, onChange, hooks.expanded);
+    Modules.background.buildDom(el, slot, cfg, onChange, hooks.expanded, scale);
 
     Modules.logo.buildDom(el, slot, cfg, originX, originY, scale, onChange, function(){
       (hooks.onRequestLogoPick || function(){})();

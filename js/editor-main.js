@@ -545,6 +545,7 @@ function clearMaterialTextState(slot){
 function setUploadedProductSrc(slot, dataUrl){
   slot.productSrc = dataUrl;
   clearMaterialTextState(slot);
+  syncMaterialPresets(slot, null);
   slot.productOffsetX = 0; slot.productOffsetY = 0; slot.productScale = 1;
 }
 
@@ -565,6 +566,9 @@ function pickProductOrMaterialForSlot(slot, path){
   // 換圖之後位置/縮放清掉重算，讓CTA避開邏輯用新圖的實際尺寸重新跑一次，
   // 不要沿用舊圖算出來的位置(舊圖跟新圖大小/形狀可能完全不同)。
   slot.productOffsetX = 0; slot.productOffsetY = 0; slot.productScale = 1;
+  // 不管這個素材需不需要疊字(hasText)，只要資料庫裡有登記presetColor就同步
+  // 色票——免運車/蝦幣堆/限時特賣這種沒有疊字框的素材也可能有專屬色票。
+  syncMaterialPresets(slot, matched);
 
   if(!matched || !matched.hasText){
     clearMaterialTextState(slot);
@@ -654,6 +658,7 @@ function bindModalObjectFields(objects, slot, cfg){
   document.getElementById('f-prod-remove').onclick = function(){
     slot.productSrc = null;
     clearMaterialTextState(slot);
+    syncMaterialPresets(slot, null);
     refreshModalStage();
     refreshMaterialTextFieldsUI(slot);
     syncProductLibrarySelect(slot);
@@ -750,9 +755,32 @@ var COMMON_COLOR_PRESETS = [
    見data/asset-library.json的presetColors）。選到（或匯入比對到）那個LOGO，
    色票列最前面就會出現它的專屬色票，後面接分隔線再接一般的常用配色。
    換LOGO/換成自己上傳的圖，專屬色票會跟著更新/消失（syncLogoPresets）。 */
+/* 2026-09：素材（例如限時特賣的CFS-娛樂/3C/生活用品）也可以各自登記專屬
+   色票（見data/asset-library.json的presetColor），跟LOGO的專屬色票是分開
+   存的兩份狀態（slot.materialPresetColor / slot.presetColors），這裡合併
+   成同一份色票列顯示：素材排前面（通常比較精準對到這一格實際的檔期/分類），
+   LOGO接在後面，顏色重複的只留一個。 */
 function getSlotPresets(slot){
-  if(slot.presetColors && slot.presetColors.length) return slot.presetColors;
-  return slot.presetBgColor ? [{ bg: slot.presetBgColor, text: slot.presetTextColor }] : [];
+  var own = (slot.presetColors && slot.presetColors.length) ? slot.presetColors.slice()
+    : (slot.presetBgColor ? [{ bg: slot.presetBgColor, text: slot.presetTextColor }] : []);
+  var mat = slot.materialPresetColor ? [slot.materialPresetColor] : [];
+  var merged = mat.concat(own);
+  var seen = {};
+  return merged.filter(function(p){
+    var key = (p && p.bg || '') + '|' + (p && p.text || '');
+    if(seen[key]) return false;
+    seen[key] = true;
+    return true;
+  });
+}
+
+/* 換素材（下拉選單或瀏覽資料庫選圖，統一都會經過pickProductOrMaterialForSlot）
+   之後，依這個素材在資料庫裡的presetColor登記更新這一格的專屬色票——跟
+   syncLogoPresets是同一套「一鍵套用檔期標準色」機制，只是換成素材觸發。
+   matched為null或沒有presetColor就清成沒有素材專屬色票。 */
+function syncMaterialPresets(slot, matched){
+  slot.materialPresetColor = (matched && matched.presetColor) ? matched.presetColor : null;
+  refreshPresetRow(slot);
 }
 
 function _presetChipHTML(attr, i, p){
@@ -795,6 +823,21 @@ function syncLogoPresets(slot, logoPath){
   slot.presetColors = f.presetColors.slice();
   slot.presetBgColor = f.presetColors.length ? f.presetColors[0].bg : null;
   slot.presetTextColor = f.presetColors.length ? f.presetColors[0].text : null;
+  // 2026-09：少數LOGO在資料庫裡登記了forceTrimMode(例如品牌會員，圖檔比例
+  // 跟LOGO框不一樣，需要裁切+底色的膠囊模式包起來才好看)，不管是Excel匯入
+  // (見editor-import.js)還是這裡手動瀏覽資料庫選到，都自動套用trim模式，
+  // 同步左側「裁切模式」按鈕的選取狀態，不然畫面已經換成膠囊、按鈕卻還
+  // 停在原圖那顆。只會「自動打開」，選到一般沒登記這個的LOGO不會反過來
+  // 把使用者原本手動選好的模式改掉。
+  if(f.forceTrimMode){
+    slot.logoMode = 'trim';
+    var modeWrap = document.getElementById('f-logo-mode');
+    if(modeWrap){
+      modeWrap.querySelectorAll('.angle-btn').forEach(function(b){
+        b.classList.toggle('active', b.dataset.mode === 'trim');
+      });
+    }
+  }
   refreshPresetRow(slot);
 }
 
@@ -970,6 +1013,23 @@ function openLibraryDrawer(label, items, onPick){
   body.className = 'library-drawer-body';
   libraryFace.appendChild(body);
 
+  // 搜尋框：品牌/名稱/比對關鍵字(matchKeys／matchType)都能搜，即時篩選
+  // 卡片，不用逐個分類展開找。有輸入內容時所有分類都會展開顯示（不受
+  // 底下手風琴「一次只開一個分類」限制，不然搜尋到別的分類的項目卻因為
+  // 收合著看不到）；清空搜尋框就恢復原本手風琴狀態。
+  var searchInput = null;
+  if(items.length > 0){
+    var searchWrap = document.createElement('div');
+    searchWrap.className = 'lib-search-wrap';
+    searchInput = document.createElement('input');
+    searchInput.type = 'text';
+    searchInput.className = 'lib-search-input';
+    searchInput.placeholder = '搜尋'+label+'（品牌／名稱）…';
+    searchInput.autocomplete = 'off';
+    searchWrap.appendChild(searchInput);
+    body.appendChild(searchWrap);
+  }
+
   if(items.length === 0){
     var empty = document.createElement('div');
     empty.className = 'hint-sm';
@@ -981,7 +1041,7 @@ function openLibraryDrawer(label, items, onPick){
       (byCategory[it.categoryLabel] = byCategory[it.categoryLabel] || []).push(it);
     });
     var catKeys = Object.keys(byCategory);
-    var groupEls = []; // 記錄每個分類的{grid, chevron}，accordion收合時要用
+    var groupEls = []; // 記錄每個分類的{grid, chevron, titleEl, cards}，accordion收合／搜尋篩選時要用
 
     catKeys.forEach(function(catLabel, catIdx){
       var title = document.createElement('div');
@@ -1003,6 +1063,7 @@ function openLibraryDrawer(label, items, onPick){
 
       var grid = document.createElement('div');
       grid.className = 'lib-grid';
+      var cardEls = []; // 這個分類底下每張卡片的{el, searchText}，給搜尋篩選用
       byCategory[catLabel].forEach(function(it){
         var card = document.createElement('div');
         card.className = 'lib-card';
@@ -1022,28 +1083,73 @@ function openLibraryDrawer(label, items, onPick){
 
         card.onclick = function(){ onPick(it.path); closeLibraryDrawer(); };
         grid.appendChild(card);
+
+        // 搜尋比對範圍：品牌/名稱/比對關鍵字(matchKeys是LOGO用、matchType是
+        // 素材用)全部併在一起小寫比對，這樣搜工單上會寫的代碼(例如「CFS-3C」
+        // 「蝦皮直營3C家電」)也找得到，不用一定要打完整品牌名稱。
+        var searchParts = [it.brand, it.name, it.matchType].concat(it.matchKeys||[]);
+        cardEls.push({ el: card, searchText: searchParts.filter(Boolean).join(' ').toLowerCase() });
       });
       body.appendChild(grid);
-      groupEls.push({ grid:grid, chevron:chevron });
+      groupEls.push({ grid:grid, chevron:chevron, titleEl:title, cards:cardEls });
 
       // 手風琴：一次只開一個分類，預設第一個展開、其餘收合，點標題切換，
       // 打開某一個會自動收合其他的（跟你舉的例子一樣：開造節就收全站大促）。
+      // 搜尋中(searchInput有輸入內容)時例外：每個分類獨立開關，不影響其他
+      // 已經因為搜尋結果而展開的分類。
       var expanded = (catIdx === 0);
       grid.style.display = expanded ? '' : 'none';
       chevron.style.transform = expanded ? 'rotate(0deg)' : 'rotate(-90deg)';
 
       title.onclick = function(){
+        var searching = !!(searchInput && searchInput.value.trim());
         var willExpand = grid.style.display === 'none';
-        groupEls.forEach(function(g){
-          g.grid.style.display = 'none';
-          g.chevron.style.transform = 'rotate(-90deg)';
-        });
-        if(willExpand){
-          grid.style.display = '';
-          chevron.style.transform = 'rotate(0deg)';
+        if(!searching){
+          groupEls.forEach(function(g){
+            g.grid.style.display = 'none';
+            g.chevron.style.transform = 'rotate(-90deg)';
+          });
         }
+        grid.style.display = willExpand ? '' : 'none';
+        chevron.style.transform = willExpand ? 'rotate(0deg)' : 'rotate(-90deg)';
       };
     });
+
+    if(searchInput){
+      searchInput.oninput = function(){
+        var q = searchInput.value.trim().toLowerCase();
+        groupEls.forEach(function(g, i){
+          if(!q){
+            // 清空搜尋 → 恢復預設手風琴狀態：全部卡片顯示、第一個分類展開
+            g.cards.forEach(function(c){ c.el.style.display = ''; });
+            g.titleEl.style.display = '';
+            g.grid.style.display = (i===0) ? '' : 'none';
+            g.chevron.style.transform = (i===0) ? 'rotate(0deg)' : 'rotate(-90deg)';
+            return;
+          }
+          var anyMatch = false;
+          g.cards.forEach(function(c){
+            var match = c.searchText.indexOf(q) >= 0;
+            c.el.style.display = match ? '' : 'none';
+            if(match) anyMatch = true;
+          });
+          g.titleEl.style.display = anyMatch ? '' : 'none';
+          g.grid.style.display = anyMatch ? '' : 'none';
+          g.chevron.style.transform = anyMatch ? 'rotate(0deg)' : 'rotate(-90deg)';
+        });
+      };
+      // 每次打開瀏覽視窗都是全新的輸入框，直接focus方便馬上打字搜尋。
+      // 2026-09修bug：這個視窗本身是用CSS transform做滑入動畫(.library-face
+      // 0.2s)，剛插入DOM時整塊還在畫面外/滑動中，這時候呼叫focus()瀏覽器
+      // 會自動把輸入框「捲動進可視範圍」，在動畫還沒跑完時硬要捲動，兩個
+      // 動作疊在一起就會看起來像抖了一下——你反映的「資料庫出現時抖動」
+      // 就是這個。加上{preventScroll:true}讓focus()不要觸發自動捲動，
+      // 滑入動畫維持原本平順的樣子，輸入框一樣會拿到焦點可以直接打字。
+      setTimeout(function(){
+        try{ searchInput.focus({ preventScroll:true }); }
+        catch(e){ searchInput.focus(); }
+      }, 0);
+    }
   }
 
   settings.classList.add('show-library');

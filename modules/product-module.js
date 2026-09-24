@@ -28,6 +28,24 @@ window.Modules.product = {
   HANDLE_R: 6,
   ROTATE_HANDLE_R: 5,
 
+  /* 陰影顏色改成跟著卡片底色算，不再用ShadowPlugin內建那個「固定灰
+     #5a5a5a／自動取樣背景圖再乘0.8」的舊邏輯（SKBN這裡底色是純色不是
+     圖片，從來沒呼叫過setBackground，所以陰影其實一直是寫死的灰色，
+     跟底色完全沒關係）。改用ColorUtils.darkenForShadow()：同色相同
+     飽和度、只把明度壓暗一個比例，公式是跟你在skbn-shadow-test.html
+     調出來的陰影色反推的，任何底色套用同一套公式，不用為每個底色寫死
+     陰影色。ShadowPlugin.shadowRGB是模組層級共用的一個變數（不分左右
+     卡片），所以每次要畫陰影前都要先呼叫這個把顏色設成「這張卡片自己」
+     的底色算出來的陰影色，再馬上呼叫renderScene——中間不能有任何
+     非同步的空隙，不然可能被另一張卡片的顏色蓋掉（目前兩個呼叫點都是
+     同步接著呼叫，沒有這個風險）。 */
+  _applyShadowColorFromBg: function(slot){
+    var baseHex = slot.bgColor || '#333';
+    var darkHex = ColorUtils.darkenForShadow(baseHex);
+    var rgb = ColorUtils.hexToRgb(darkHex);
+    ShadowPlugin.setShadowColorRGB(rgb.r+','+rgb.g+','+rgb.b);
+  },
+
   /* 券樣類素材（slot.materialTexts有值時，例如商城券*1配"$100"）：文字疊在
      券圖上一塊或多塊「看不見的文字範圍」(boxes，來自
      configs/material-text-style.js)裡，自動找出「剛好塞得進這個範圍」的
@@ -399,18 +417,31 @@ window.Modules.product = {
 
     function redraw(){
       ctx.clearRect(0,0,boxW,boxH);
-      ctx.fillStyle = slot.bgColor || '#333';
-      ctx.fillRect(0,0,boxW,boxH);
+      // glowEnabled的版位(左右)，底色+光暈已經畫在下面那層DOM background了，
+      // 這裡不能再補畫一塊純色矩形蓋上去——不然商品這個canvas會整個蓋住
+      // 底下的光暈(canvas疊在background那層DOM上面，畫實心色塊=完全遮住)。
+      // 維持clearRect保持透明，讓底下的背景/光暈透出來就好；沒開光暈的
+      // 版位(中間KV)維持原本行為不變。
+      if(!cfg.glowEnabled){
+        ctx.fillStyle = slot.bgColor || '#333';
+        ctx.fillRect(0,0,boxW,boxH);
+      }
       if(!img) return;
       var fit = Modules.product._computeFit(img, boxW, boxH, slot, trim);
       lastFit = fit;
       var pv = pivot(fit);
 
       if(shadowOn() && registeredId){
+        Modules.product._applyShadowColorFromBg(slot);
         ShadowPlugin.setAngle(slot.shadowAngle);
         var shx = fit.x + (slot.shadowOffsetX||0)*boxW;
         var shy = fit.groundY + (slot.shadowOffsetY||0)*boxH;
-        ShadowPlugin.renderScene(ctx, [{ id:registeredId, x:shx, y:shy, w:fit.w, h:fit.h }], true);
+        /* 2026-09跟你確認：接地陰影(商品腳下那條)不能跟著「陰影左右/上下位移」
+           滑桿一起跑，只有主陰影/中角度柔霧可以被這兩個滑桿挪動。這裡額外多帶
+           groundAnchorX/Y(商品沒加位移的原始接地位置)給shadow-plugin.js，
+           它會專門拿這組值去算接地陰影的位置，x/y(shx/shy，已經加了位移)還是
+           照舊給主陰影/柔霧用。 */
+        ShadowPlugin.renderScene(ctx, [{ id:registeredId, x:shx, y:shy, w:fit.w, h:fit.h, groundAnchorX: fit.x, groundAnchorY: fit.groundY }], true);
       }
 
       // 商品照片＋券樣文字：繞著選取框中心旋轉（陰影不轉，維持貼地）
@@ -622,10 +653,13 @@ window.Modules.product = {
         var absAnchorX = lx+fit.x, absAnchorY = ly+fit.groundY;
 
         if(slot.shadowAngle && slot.shadowAngle !== 'off'){
+          Modules.product._applyShadowColorFromBg(slot);
           ShadowPlugin.setAngle(slot.shadowAngle);
           var shx = absAnchorX + (slot.shadowOffsetX||0)*z.w;
           var shy = absAnchorY + (slot.shadowOffsetY||0)*z.h;
-          ShadowPlugin.renderScene(ctx, [{ id:id, x:shx, y:shy, w:fit.w, h:fit.h }], true);
+          // 跟redraw()那邊同一個道理：接地陰影固定用absAnchorX/Y(沒加位移)，
+          // 主陰影/柔霧才吃shx/shy(加了位移)。
+          ShadowPlugin.renderScene(ctx, [{ id:id, x:shx, y:shy, w:fit.w, h:fit.h, groundAnchorX: absAnchorX, groundAnchorY: absAnchorY }], true);
         }
 
         var t = fit.tight;

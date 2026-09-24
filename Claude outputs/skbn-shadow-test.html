@@ -1,0 +1,422 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<title>SKBN 商品陰影檢測工具</title>
+<style>
+  :root{ color-scheme: light; }
+  body{ font-family: -apple-system, "PingFang TC", "Microsoft JhengHei", sans-serif; background:#f2f2f4; margin:0; padding:24px; color:#222; }
+  h1{ font-size:16px; margin:0 0 4px; }
+  .hint{ font-size:12px; color:#777; margin:0 0 20px; max-width:640px; }
+  .wrap{ display:flex; gap:28px; flex-wrap:wrap; align-items:flex-start; }
+  .stage-col{ display:flex; flex-direction:column; align-items:center; gap:8px; }
+  canvas{ border-radius:20px; box-shadow:0 2px 10px rgba(0,0,0,.15); background:#d0011b; }
+  .panel{ background:#fff; border-radius:12px; padding:18px 20px; min-width:320px; box-shadow:0 1px 4px rgba(0,0,0,.08); }
+  .panel h2{ font-size:14px; margin:0 0 14px; }
+  .row{ margin-bottom:14px; }
+  .row label{ display:flex; justify-content:space-between; font-size:12px; color:#555; margin-bottom:4px; }
+  .row input[type=range]{ width:100%; }
+  .row input[type=color]{ width:44px; height:28px; border:none; padding:0; vertical-align:middle; cursor:pointer; }
+  .row input[type=text]{ width:100px; font-size:12px; padding:3px 6px; border:1px solid #ccc; border-radius:5px; }
+  .swatchline{ display:flex; align-items:center; gap:10px; }
+  .toggles{ display:flex; gap:14px; font-size:12px; color:#555; margin-bottom:14px; flex-wrap:wrap; }
+  .toggles label{ display:flex; align-items:center; gap:5px; cursor:pointer; }
+  .presets{ display:flex; gap:8px; margin-bottom:14px; }
+  .presets button{ flex:1; font-size:12px; padding:6px 0; border:1px solid #ddd; background:#fafafa; border-radius:6px; cursor:pointer; }
+  .presets button:hover{ background:#eee; }
+  .dropzone{ border:2px dashed #ccc; border-radius:8px; padding:16px; text-align:center; font-size:12px; color:#777; cursor:pointer; margin-bottom:14px; }
+  .dropzone:hover{ border-color:#aaa; }
+  .values{ font-size:11px; color:#888; line-height:1.7; background:#f7f7f9; border-radius:8px; padding:10px 12px; margin-top:4px; white-space:pre-wrap; word-break:break-all; }
+  code{ background:#eee; padding:1px 4px; border-radius:3px; }
+</style>
+</head>
+<body>
+
+<h1>SKBN 商品陰影檢測工具</h1>
+<p class="hint">上傳你自己的去背商品PNG，右側調陰影顏色/模糊/其他參數，左邊畫面即時更新。這裡用的是跟正式程式一模一樣的 ShadowPlugin 演算法（stampLayer/漸層淡出/接地補強都照抄），不是簡化版，調好的數字可以直接套回正式程式。</p>
+
+<div class="wrap">
+
+  <div class="stage-col">
+    <div class="dropzone" id="dropzone">拖曳或點擊上傳商品PNG（建議去背透明圖）</div>
+    <input type="file" id="fileInput" accept="image/png" style="display:none;">
+    <canvas id="stage" width="480" height="480"></canvas>
+  </div>
+
+  <div class="panel">
+    <h2>底色 / 光源</h2>
+    <div class="row">
+      <div class="swatchline">
+        <span>卡片底色</span>
+        <input type="color" id="bgColor" value="#d0011b">
+        <input type="text" id="bgColorHex" value="#d0011b">
+      </div>
+    </div>
+    <div class="presets">
+      <button data-angle="left">光源：左</button>
+      <button data-angle="top" class="active">光源：中</button>
+      <button data-angle="right">光源：右</button>
+    </div>
+
+    <h2>陰影顏色</h2>
+    <div class="row">
+      <label>使用固定顏色（關閉＝自動取樣底色*0.8）</label>
+      <div class="swatchline">
+        <input type="checkbox" id="useFixedColor" checked>
+        <input type="color" id="shadowColor" value="#5a5a5a">
+        <input type="text" id="shadowColorHex" value="#5a5a5a">
+      </div>
+    </div>
+
+    <h2>陰影形狀</h2>
+    <div class="row">
+      <label>模糊/柔邊 soft <span id="vSoft">16</span></label>
+      <input type="range" id="soft" min="0" max="60" step="1" value="16">
+    </div>
+    <div class="row">
+      <label>淡出距離 fade <span id="vFade">120</span></label>
+      <input type="range" id="fade" min="20" max="300" step="1" value="120">
+    </div>
+    <div class="row">
+      <label>被商品自身遮擋強度 occlude <span id="vOcclude">80</span></label>
+      <input type="range" id="occlude" min="0" max="100" step="1" value="80">
+    </div>
+    <div class="row">
+      <label>壓扁比例 squash <span id="vSquash">0.32</span></label>
+      <input type="range" id="squash" min="0.05" max="0.8" step="0.01" value="0.32">
+    </div>
+    <div class="row">
+      <label>接地補強陰影透明度 contactAlpha <span id="vContact">0.55</span></label>
+      <input type="range" id="contactAlpha" min="0" max="1" step="0.01" value="0.55">
+    </div>
+
+    <div class="toggles">
+      <label><input type="checkbox" id="showContact" checked> 顯示接地補強陰影</label>
+      <label><input type="checkbox" id="showMain" checked> 顯示主斜切陰影</label>
+    </div>
+
+    <div class="values" id="valuesOut"></div>
+  </div>
+</div>
+
+<script>
+'use strict';
+
+/* ============ 直接搬正式的 shadow-plugin.js drawGroundShadow 邏輯，
+   只把 FIXED 常數跟 shadowRGB 改成外部可即時調整（正式檔案裡這些是寫死的），
+   其餘運算(stampLayer/漸層/接地補強/遮擋)完全照抄，方便調好的數字可以直接
+   套回 modules/product-module.js 呼叫的 ShadowPlugin 那份。 ============ */
+
+var ANGLE_PRESETS = { left: -35, top: 0, right: 35 };
+var state = {
+  angle: ANGLE_PRESETS.top,
+  presetName: 'top',
+  soft: 16,
+  fade: 120,
+  occlude: 80,
+  squash: 0.32,
+  contactAlpha: 0.55,
+  shadowRGB: '90,90,90',
+  useFixedColor: true,
+  bgHex: '#d0011b',
+  showContact: true,
+  showMain: true
+};
+
+var img = null, silhouette = null, tinted = null, trim = null;
+
+function hexToRgbStr(hex){
+  hex = hex.replace('#','');
+  var num = parseInt(hex,16);
+  return ((num>>16)&255)+','+((num>>8)&255)+','+(num&255);
+}
+
+function buildSilhouette(im){
+  var c = document.createElement('canvas');
+  c.width = im.naturalWidth; c.height = im.naturalHeight;
+  var ctx = c.getContext('2d');
+  ctx.drawImage(im,0,0);
+  ctx.globalCompositeOperation = 'source-in';
+  ctx.fillStyle = '#000000';
+  ctx.fillRect(0,0,c.width,c.height);
+  return c;
+}
+
+function tintProduct(){
+  if(!silhouette) return;
+  var t = document.createElement('canvas');
+  t.width = silhouette.width; t.height = silhouette.height;
+  var tctx = t.getContext('2d');
+  tctx.drawImage(silhouette,0,0);
+  tctx.globalCompositeOperation = 'source-in';
+  tctx.fillStyle = 'rgb('+state.shadowRGB+')';
+  tctx.fillRect(0,0,t.width,t.height);
+  tinted = t;
+}
+
+function detectAlphaTrim(im){
+  var c = document.createElement('canvas');
+  var maxDim = 300;
+  var scale = Math.min(1, maxDim/Math.max(im.naturalWidth, im.naturalHeight));
+  var w = Math.max(1, Math.round(im.naturalWidth*scale));
+  var h = Math.max(1, Math.round(im.naturalHeight*scale));
+  c.width=w; c.height=h;
+  var cctx = c.getContext('2d');
+  cctx.drawImage(im,0,0,w,h);
+  var top=0,bottom=0,left=0,right=0;
+  try{
+    var d = cctx.getImageData(0,0,w,h).data;
+    var minY=h,maxY=-1,minX=w,maxX=-1;
+    var alphaThresh=10;
+    for(var y=0;y<h;y++){
+      for(var x=0;x<w;x++){
+        var a = d[(y*w+x)*4+3];
+        if(a>alphaThresh){
+          if(y<minY)minY=y; if(y>maxY)maxY=y;
+          if(x<minX)minX=x; if(x>maxX)maxX=x;
+        }
+      }
+    }
+    if(maxY>=0){
+      top=minY/h; bottom=(h-1-maxY)/h; left=minX/w; right=(w-1-maxX)/w;
+    }
+  }catch(e){}
+  return {top:top,bottom:bottom,left:left,right:right};
+}
+
+function stampLayer(targetCtx, tintedImg, ox, oy, pw, ph, shear, squash, spread, totalAlpha, samples){
+  if(!tintedImg) return;
+  targetCtx.save();
+  targetCtx.globalCompositeOperation = 'multiply';
+  targetCtx.globalAlpha = totalAlpha/samples;
+  for(var i=0;i<samples;i++){
+    var ang = (i/samples)*Math.PI*2*2.4;
+    var rad = spread*Math.sqrt((i+0.5)/samples);
+    var dx = Math.cos(ang)*rad;
+    var dy = Math.sin(ang)*rad*0.4;
+    targetCtx.save();
+    targetCtx.translate(ox+dx, oy+dy);
+    targetCtx.transform(1,0,shear,squash,0,0);
+    targetCtx.drawImage(tintedImg, -pw/2, -ph, pw, ph);
+    targetCtx.restore();
+  }
+  targetCtx.restore();
+}
+
+function drawGroundShadow(ctx, cx, groundY, pw, ph){
+  var squash = state.squash;
+  var trimBottomPad = trim ? trim.bottom*ph : 0;
+  var py = groundY + trimBottomPad;
+  var shadowGroundY = groundY + trimBottomPad*squash;
+  var trimCenterOffsetX = trim ? (trim.left - trim.right)*pw/2 : 0;
+  var shadowCx = cx + trimCenterOffsetX;
+
+  if(state.showContact){
+    var CONTACT_GROW_PX = 2;
+    var contactH = ph + CONTACT_GROW_PX;
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(cx-pw/2, py, pw, CONTACT_GROW_PX);
+    ctx.clip();
+    ctx.globalCompositeOperation = 'multiply';
+    ctx.globalAlpha = state.contactAlpha;
+    ctx.drawImage(tinted, cx-pw/2, py-ph, pw, contactH);
+    ctx.restore();
+  }
+
+  var angle = state.angle*Math.PI/180;
+  var soft = state.soft;
+  var fadeMul = state.fade/100;
+  var occludeStrength = state.occlude/100;
+  var shear = Math.tan(angle*0.55);
+  var maxSpread = soft*1.8;
+
+  if(state.presetName !== 'top' && state.showMain){
+    var halfW = pw/2 + Math.abs(shear)*ph + maxSpread*2 + 20;
+    var tempW = Math.ceil(halfW*2);
+    var tempH = Math.ceil(ph*squash*2 + maxSpread*2 + 40);
+    var anchorX = halfW;
+    var anchorY = Math.ceil(tempH*0.5);
+
+    var tmp = document.createElement('canvas');
+    tmp.width = tempW; tmp.height = tempH;
+    var tctx = tmp.getContext('2d');
+
+    stampLayer(tctx, tinted, anchorX, anchorY, pw, ph, shear, squash, soft*1.8, 0.28, 12);
+    stampLayer(tctx, tinted, anchorX, anchorY, pw, ph, shear, squash, soft*0.8, 0.4, 10);
+    stampLayer(tctx, tinted, anchorX, anchorY, pw, ph, shear, squash, soft*0.25, 0.35, 6);
+
+    var tipX = -shear*ph*fadeMul;
+    var tipY = -squash*ph*fadeMul - soft*0.6;
+    tctx.globalCompositeOperation = 'destination-in';
+    var grad = tctx.createLinearGradient(anchorX, anchorY, anchorX+tipX, anchorY+tipY);
+    grad.addColorStop(0, 'rgba(255,255,255,1)');
+    grad.addColorStop(0.55, 'rgba(255,255,255,0.85)');
+    grad.addColorStop(1, 'rgba(255,255,255,0)');
+    tctx.fillStyle = grad;
+    tctx.fillRect(0,0,tempW,tempH);
+    tctx.globalCompositeOperation = 'source-over';
+
+    ctx.save();
+    ctx.beginPath();
+    var clipMarginBelow = 5;
+    var clipSpanX = ctx.canvas.width*3;
+    ctx.rect(shadowCx-clipSpanX, shadowGroundY-clipSpanX, clipSpanX*2, clipSpanX+clipMarginBelow);
+    ctx.clip();
+    ctx.globalCompositeOperation = 'multiply';
+    ctx.drawImage(tmp, shadowCx-anchorX, shadowGroundY-anchorY);
+    ctx.restore();
+  }
+
+  if(img && img.complete && img.naturalWidth){
+    ctx.drawImage(img, cx-pw/2, py-ph, pw, ph);
+  }
+}
+
+function render(){
+  var canvas = document.getElementById('stage');
+  var ctx = canvas.getContext('2d');
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+  canvas.style.background = state.bgHex;
+
+  if(!img){
+    ctx.fillStyle = 'rgba(255,255,255,0.5)';
+    ctx.font = '13px sans-serif';
+    ctx.fillText('請先上傳商品PNG', 20, 40);
+    updateValuesOut();
+    return;
+  }
+
+  var boxW = canvas.width*0.7, boxH = canvas.height*0.55;
+  var scale = Math.min(boxW/img.naturalWidth, boxH/img.naturalHeight);
+  var pw = img.naturalWidth*scale, ph = img.naturalHeight*scale;
+  var cx = canvas.width/2;
+  var groundY = canvas.height*0.82;
+
+  drawGroundShadow(ctx, cx, groundY, pw, ph);
+  updateValuesOut();
+}
+
+function updateValuesOut(){
+  var lines = [
+    '// 調好之後把這組數字告訴我，我對照套回 shadow-plugin.js 的 FIXED',
+    'soft: ' + state.soft + ',',
+    'fade: ' + state.fade + ',',
+    'occlude: ' + state.occlude + ',',
+    'squash: ' + state.squash + ',',
+    'contactAlpha(接地補強透明度): ' + state.contactAlpha + ',',
+    'shadowRGB: ' + (state.useFixedColor ? "'"+state.shadowRGB+"'  (固定顏色)" : '自動取樣底色*0.8 (目前底色測試值約 ' + autoSampleColor() + ')')
+  ];
+  document.getElementById('valuesOut').textContent = lines.join('\n');
+}
+
+function autoSampleColor(){
+  var rgb = hexToRgbStr(state.bgHex).split(',').map(Number);
+  return Math.round(rgb[0]*0.8)+','+Math.round(rgb[1]*0.8)+','+Math.round(rgb[2]*0.8);
+}
+
+function loadImageFile(file){
+  var reader = new FileReader();
+  reader.onload = function(e){
+    var im = new Image();
+    im.onload = function(){
+      img = im;
+      silhouette = buildSilhouette(im);
+      trim = detectAlphaTrim(im);
+      tintProduct();
+      render();
+    };
+    im.src = e.target.result;
+  };
+  reader.readAsDataURL(file);
+}
+
+// ---- UI wiring ----
+var dropzone = document.getElementById('dropzone');
+var fileInput = document.getElementById('fileInput');
+dropzone.onclick = function(){ fileInput.click(); };
+fileInput.onchange = function(){ if(fileInput.files[0]) loadImageFile(fileInput.files[0]); };
+['dragenter','dragover'].forEach(function(evt){
+  dropzone.addEventListener(evt, function(e){ e.preventDefault(); dropzone.style.borderColor='#EE4D2D'; });
+});
+['dragleave','drop'].forEach(function(evt){
+  dropzone.addEventListener(evt, function(e){ e.preventDefault(); dropzone.style.borderColor='#ccc'; });
+});
+dropzone.addEventListener('drop', function(e){
+  e.preventDefault();
+  var f = e.dataTransfer.files && e.dataTransfer.files[0];
+  if(f) loadImageFile(f);
+});
+
+document.getElementById('bgColor').oninput = function(){
+  state.bgHex = this.value;
+  document.getElementById('bgColorHex').value = this.value;
+  if(!state.useFixedColor){ state.shadowRGB = autoSampleColor(); tintProduct(); }
+  render();
+};
+document.getElementById('bgColorHex').onchange = function(){
+  if(!/^#[0-9a-fA-F]{6}$/.test(this.value)) return;
+  state.bgHex = this.value;
+  document.getElementById('bgColor').value = this.value;
+  if(!state.useFixedColor){ state.shadowRGB = autoSampleColor(); tintProduct(); }
+  render();
+};
+
+document.querySelectorAll('.presets button').forEach(function(btn){
+  btn.onclick = function(){
+    document.querySelectorAll('.presets button').forEach(function(b){ b.classList.remove('active'); });
+    btn.classList.add('active');
+    var key = btn.getAttribute('data-angle');
+    state.angle = ANGLE_PRESETS[key];
+    state.presetName = key;
+    render();
+  };
+});
+
+document.getElementById('useFixedColor').onchange = function(){
+  state.useFixedColor = this.checked;
+  if(!state.useFixedColor){ state.shadowRGB = autoSampleColor(); }
+  else { state.shadowRGB = hexToRgbStr(document.getElementById('shadowColor').value); }
+  tintProduct();
+  render();
+};
+document.getElementById('shadowColor').oninput = function(){
+  document.getElementById('shadowColorHex').value = this.value;
+  if(state.useFixedColor){
+    state.shadowRGB = hexToRgbStr(this.value);
+    tintProduct();
+    render();
+  }
+};
+document.getElementById('shadowColorHex').onchange = function(){
+  if(!/^#[0-9a-fA-F]{6}$/.test(this.value)) return;
+  document.getElementById('shadowColor').value = this.value;
+  if(state.useFixedColor){
+    state.shadowRGB = hexToRgbStr(this.value);
+    tintProduct();
+    render();
+  }
+};
+
+function bindSlider(id, stateKey, labelId, isFloat){
+  document.getElementById(id).oninput = function(){
+    var v = isFloat ? parseFloat(this.value) : parseInt(this.value,10);
+    state[stateKey] = v;
+    document.getElementById(labelId).textContent = isFloat ? v.toFixed(2) : v;
+    render();
+  };
+}
+bindSlider('soft','soft','vSoft',false);
+bindSlider('fade','fade','vFade',false);
+bindSlider('occlude','occlude','vOcclude',false);
+bindSlider('squash','squash','vSquash',true);
+bindSlider('contactAlpha','contactAlpha','vContact',true);
+
+document.getElementById('showContact').onchange = function(){ state.showContact=this.checked; render(); };
+document.getElementById('showMain').onchange = function(){ state.showMain=this.checked; render(); };
+
+state.shadowRGB = hexToRgbStr(document.getElementById('shadowColor').value);
+render();
+</script>
+</body>
+</html>

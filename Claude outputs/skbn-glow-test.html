@@ -1,0 +1,408 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<title>SKBN 光暈檢測工具</title>
+<style>
+  :root{ color-scheme: light; }
+  body{ font-family: -apple-system, "PingFang TC", "Microsoft JhengHei", sans-serif; background:#f2f2f4; margin:0; padding:24px; color:#222; }
+  h1{ font-size:16px; margin:0 0 4px; }
+  .hint{ font-size:12px; color:#777; margin:0 0 20px; }
+  .wrap{ display:flex; gap:28px; flex-wrap:wrap; align-items:flex-start; }
+  .card-col{ display:flex; flex-direction:column; align-items:center; gap:8px; }
+  .card-col h3{ font-size:13px; margin:0; color:#444; }
+  canvas{ border-radius:35px; box-shadow:0 2px 10px rgba(0,0,0,.15); cursor:grab; touch-action:none; }
+  canvas.dragging{ cursor:grabbing; }
+  .panel{ background:#fff; border-radius:12px; padding:18px 20px; min-width:300px; box-shadow:0 1px 4px rgba(0,0,0,.08); }
+  .panel h2{ font-size:14px; margin:0 0 14px; }
+  .row{ margin-bottom:14px; }
+  .row label{ display:flex; justify-content:space-between; font-size:12px; color:#555; margin-bottom:4px; }
+  .row input[type=range]{ width:100%; }
+  .row input[type=color]{ width:44px; height:28px; border:none; padding:0; vertical-align:middle; cursor:pointer; }
+  .row input[type=text]{ width:80px; font-size:12px; padding:3px 6px; border:1px solid #ccc; border-radius:5px; }
+  .swatchline{ display:flex; align-items:center; gap:10px; }
+  .swatch{ width:28px; height:28px; border-radius:6px; border:1px solid #ddd; }
+  .toggles{ display:flex; gap:14px; font-size:12px; color:#555; margin-bottom:14px; }
+  .toggles label{ display:flex; align-items:center; gap:5px; cursor:pointer; }
+  .formula{ font-size:11px; color:#888; line-height:1.6; background:#f7f7f9; border-radius:8px; padding:10px 12px; margin-top:4px; }
+  .presets{ display:flex; gap:8px; margin-bottom:14px; }
+  .presets button{ flex:1; font-size:12px; padding:6px 0; border:1px solid #ddd; background:#fafafa; border-radius:6px; cursor:pointer; }
+  .presets button:hover{ background:#eee; }
+  code{ background:#eee; padding:1px 4px; border-radius:3px; }
+</style>
+</head>
+<body>
+
+<h1>SKBN 光暈檢測工具</h1>
+<p class="hint">左右兩張卡片可以直接在圖上拖曳光暈中心；下方數值同步更新。虛線是文字區(textZone)跟商品圖區(artZone)的邊界，方便檢查光暈有沒有跑到文字底下。</p>
+
+<div class="wrap">
+
+  <div class="card-col">
+    <h3>左卡（示範藍色）</h3>
+    <canvas id="cLeft" width="336" height="318"></canvas>
+  </div>
+
+  <div class="card-col">
+    <h3>右卡（示範紅色，同你核可的 #ff5c6f）</h3>
+    <canvas id="cRight" width="336" height="318"></canvas>
+  </div>
+
+  <div class="panel">
+    <h2>參數</h2>
+
+    <div class="presets">
+      <button data-preset="left">套用左卡預設(#0054a4)</button>
+      <button data-preset="right">套用右卡預設(#d0011b)</button>
+    </div>
+
+    <div class="row">
+      <label>兩張卡是否共用同一組參數<input type="checkbox" id="linkBoth" checked></label>
+    </div>
+
+    <div class="row">
+      <div class="swatchline">
+        <span>底色</span>
+        <input type="color" id="baseColor" value="#d0011b">
+        <input type="text" id="baseColorHex" value="#d0011b">
+      </div>
+    </div>
+
+    <div class="row">
+      <label>光暈強度 peak_alpha <span id="vAlpha">0.72</span></label>
+      <input type="range" id="alpha" min="0" max="1" step="0.01" value="0.72">
+    </div>
+
+    <div class="row">
+      <label>明度推移比例 k（0=不變, 1=推到全白） <span id="vK">0.46</span></label>
+      <input type="range" id="kVal" min="0" max="1" step="0.01" value="0.46">
+    </div>
+
+    <div class="row">
+      <label>水平柔邊 sigma_x <span id="vSx">66</span></label>
+      <input type="range" id="sigmaX" min="10" max="200" step="1" value="66">
+    </div>
+
+    <div class="row">
+      <label>垂直柔邊 sigma_y <span id="vSy">67</span></label>
+      <input type="range" id="sigmaY" min="10" max="200" step="1" value="67">
+    </div>
+
+    <div class="row">
+      <label>中心位置 (拖圖上的光暈，或用下面微調) cx / cy</label>
+      <div style="display:flex; gap:8px;">
+        <input type="text" id="cxVal" value="168">
+        <input type="text" id="cyVal" value="221">
+      </div>
+    </div>
+
+    <div class="toggles">
+      <label><input type="checkbox" id="showZones" checked> 顯示 textZone/artZone 邊界</label>
+      <label><input type="checkbox" id="dither" checked> 抗色階(dither)</label>
+    </div>
+
+    <div class="row">
+      <label>光暈色（依公式自動算出）</label>
+      <div class="swatchline">
+        <div class="swatch" id="glowSwatch"></div>
+        <code id="glowHex">#fe5d71</code>
+      </div>
+    </div>
+
+    <div class="formula">
+      公式：同色相(H)、同飽和度(S)，明度 L_new = L + (1-L) × k<br>
+      光暈透明度：peak_alpha × exp( -[((x-cx)/sigma_x)² + ((y-cy)/sigma_y)²] / 2 )<br>
+      artZone（商品圖區，本地座標）：x0,y0,w,h = 0,116,336,202<br>
+      textZone（文字區，本地座標，左卡約）：x0,y0,w,h = 6,68,324,38
+    </div>
+  </div>
+</div>
+
+<script>
+'use strict';
+
+// ---- zones (local card coords, from configs/skbn-layout.js, 左右幾乎相同) ----
+var ART_ZONE  = { x:0, y:116, w:336, h:202 };
+var TEXT_ZONE = { x:6, y:68,  w:324, h:38 };
+
+// ---- color helpers (mirrors js/color-utils.js rgbToHsl/hslToRgb) ----
+function hexToRgb(hex){
+  hex = String(hex||'').replace('#','');
+  if(hex.length===3) hex = hex.split('').map(function(c){return c+c;}).join('');
+  var num = parseInt(hex,16);
+  return { r:(num>>16)&255, g:(num>>8)&255, b:num&255 };
+}
+function rgbToHex(r,g,b){
+  function h(v){ v=Math.max(0,Math.min(255,Math.round(v))); var s=v.toString(16); return s.length===1?'0'+s:s; }
+  return '#'+h(r)+h(g)+h(b);
+}
+function rgbToHsl(r,g,b){
+  r/=255; g/=255; b/=255;
+  var max=Math.max(r,g,b), min=Math.min(r,g,b);
+  var h=0,s=0,l=(max+min)/2;
+  if(max!==min){
+    var d=max-min;
+    s = l>0.5 ? d/(2-max-min) : d/(max+min);
+    switch(max){
+      case r: h=(g-b)/d+(g<b?6:0); break;
+      case g: h=(b-r)/d+2; break;
+      case b: h=(r-g)/d+4; break;
+    }
+    h*=60;
+  }
+  return { h:h, s:s, l:l }; // s,l as 0..1
+}
+function hslToRgb(h,s,l){
+  h=((h%360)+360)%360;
+  if(s===0){ var v=l*255; return {r:v,g:v,b:v}; }
+  var q = l<0.5 ? l*(1+s) : l+s-l*s;
+  var p = 2*l-q;
+  function hue2rgb(t){
+    if(t<0) t+=1; if(t>1) t-=1;
+    if(t<1/6) return p+(q-p)*6*t;
+    if(t<1/2) return q;
+    if(t<2/3) return p+(q-p)*(2/3-t)*6;
+    return p;
+  }
+  var hk=h/360;
+  return { r:hue2rgb(hk+1/3)*255, g:hue2rgb(hk)*255, b:hue2rgb(hk-1/3)*255 };
+}
+function lighten(rgb, k){
+  var hsl = rgbToHsl(rgb.r, rgb.g, rgb.b);
+  var l2 = hsl.l + (1-hsl.l)*k;
+  return hslToRgb(hsl.h, hsl.s, l2);
+}
+
+// ---- per-canvas state ----
+function makeCardState(canvas, baseHex, cx, cy){
+  return {
+    canvas: canvas,
+    ctx: canvas.getContext('2d'),
+    baseHex: baseHex,
+    alpha: 0.72,
+    k: 0.46,
+    sigmaX: 66,
+    sigmaY: 67,
+    cx: cx,
+    cy: cy,
+    dragging: false
+  };
+}
+
+var leftState  = makeCardState(document.getElementById('cLeft'),  '#0054a4', 168, 221);
+var rightState = makeCardState(document.getElementById('cRight'), '#d0011b', 168, 221);
+
+function render(state){
+  var w = state.canvas.width, h = state.canvas.height;
+  var ctx = state.ctx;
+  var base = hexToRgb(state.baseHex);
+  var light = lighten(base, state.k);
+
+  var img = ctx.createImageData(w, h);
+  var d = img.data;
+  var dith = document.getElementById('dither').checked;
+
+  for(var y=0;y<h;y++){
+    for(var x=0;x<w;x++){
+      var dx = (x - state.cx) / state.sigmaX;
+      var dy = (y - state.cy) / state.sigmaY;
+      var dist2 = dx*dx + dy*dy;
+      var a = state.alpha * Math.exp(-dist2/2);
+      if(a<0) a=0; if(a>1) a=1;
+      var idx = (y*w+x)*4;
+      var r = base.r*(1-a) + light.r*a;
+      var g = base.g*(1-a) + light.g*a;
+      var b = base.b*(1-a) + light.b*a;
+      if(dith){
+        var n = (Math.random()-0.5)*1.6;
+        r+=n; g+=n; b+=n;
+      }
+      d[idx]   = Math.max(0,Math.min(255, r));
+      d[idx+1] = Math.max(0,Math.min(255, g));
+      d[idx+2] = Math.max(0,Math.min(255, b));
+      d[idx+3] = 255;
+    }
+  }
+  ctx.putImageData(img, 0, 0);
+
+  if(document.getElementById('showZones').checked){
+    ctx.save();
+    ctx.strokeStyle = 'rgba(255,255,255,0.85)';
+    ctx.setLineDash([5,4]);
+    ctx.lineWidth = 1.5;
+    ctx.strokeRect(ART_ZONE.x+0.5, ART_ZONE.y+0.5, ART_ZONE.w-1, ART_ZONE.h-1);
+    ctx.strokeStyle = 'rgba(255,220,80,0.95)';
+    ctx.strokeRect(TEXT_ZONE.x+0.5, TEXT_ZONE.y+0.5, TEXT_ZONE.w-1, TEXT_ZONE.h-1);
+    ctx.restore();
+  }
+
+  // center marker
+  ctx.save();
+  ctx.strokeStyle = 'rgba(255,255,255,0.9)';
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.moveTo(state.cx-6, state.cy); ctx.lineTo(state.cx+6, state.cy);
+  ctx.moveTo(state.cx, state.cy-6); ctx.lineTo(state.cx, state.cy+6);
+  ctx.stroke();
+  ctx.restore();
+
+  return { light: light };
+}
+
+function updateHexDisplay(light){
+  var hex = rgbToHex(light.r, light.g, light.b);
+  document.getElementById('glowHex').textContent = hex;
+  document.getElementById('glowSwatch').style.background = hex;
+}
+
+function renderAll(){
+  render(leftState);
+  var res = render(rightState);
+  updateHexDisplay(res.light);
+}
+
+// ---- controls wiring ----
+var linkBoth = document.getElementById('linkBoth');
+function activeStates(){
+  return linkBoth.checked ? [leftState, rightState] : [rightState];
+}
+
+function syncControlsFrom(state){
+  document.getElementById('alpha').value = state.alpha;
+  document.getElementById('vAlpha').textContent = state.alpha.toFixed(2);
+  document.getElementById('kVal').value = state.k;
+  document.getElementById('vK').textContent = state.k.toFixed(2);
+  document.getElementById('sigmaX').value = state.sigmaX;
+  document.getElementById('vSx').textContent = state.sigmaX;
+  document.getElementById('sigmaY').value = state.sigmaY;
+  document.getElementById('vSy').textContent = state.sigmaY;
+  document.getElementById('cxVal').value = Math.round(state.cx);
+  document.getElementById('cyVal').value = Math.round(state.cy);
+  document.getElementById('baseColor').value = state.baseHex;
+  document.getElementById('baseColorHex').value = state.baseHex;
+}
+
+document.getElementById('alpha').oninput = function(){
+  var v = parseFloat(this.value);
+  document.getElementById('vAlpha').textContent = v.toFixed(2);
+  activeStates().forEach(function(s){ s.alpha = v; });
+  renderAll();
+};
+document.getElementById('kVal').oninput = function(){
+  var v = parseFloat(this.value);
+  document.getElementById('vK').textContent = v.toFixed(2);
+  activeStates().forEach(function(s){ s.k = v; });
+  renderAll();
+};
+document.getElementById('sigmaX').oninput = function(){
+  var v = parseFloat(this.value);
+  document.getElementById('vSx').textContent = v;
+  activeStates().forEach(function(s){ s.sigmaX = v; });
+  renderAll();
+};
+document.getElementById('sigmaY').oninput = function(){
+  var v = parseFloat(this.value);
+  document.getElementById('vSy').textContent = v;
+  activeStates().forEach(function(s){ s.sigmaY = v; });
+  renderAll();
+};
+document.getElementById('cxVal').onchange = function(){
+  var v = parseFloat(this.value)||0;
+  activeStates().forEach(function(s){ s.cx = v; });
+  renderAll();
+};
+document.getElementById('cyVal').onchange = function(){
+  var v = parseFloat(this.value)||0;
+  activeStates().forEach(function(s){ s.cy = v; });
+  renderAll();
+};
+document.getElementById('baseColor').oninput = function(){
+  document.getElementById('baseColorHex').value = this.value;
+  activeStates().forEach(function(s){ s.baseHex = this.value; }.bind(this));
+  renderAll();
+};
+document.getElementById('baseColorHex').onchange = function(){
+  var v = this.value;
+  if(!/^#[0-9a-fA-F]{6}$/.test(v)) return;
+  document.getElementById('baseColor').value = v;
+  activeStates().forEach(function(s){ s.baseHex = v; });
+  renderAll();
+};
+document.getElementById('showZones').onchange = renderAll;
+document.getElementById('dither').onchange = renderAll;
+
+document.querySelectorAll('.presets button').forEach(function(btn){
+  btn.onclick = function(){
+    var which = btn.getAttribute('data-preset');
+    var hex = which==='left' ? '#0054a4' : '#d0011b';
+    document.getElementById('baseColor').value = hex;
+    document.getElementById('baseColorHex').value = hex;
+    activeStates().forEach(function(s){ s.baseHex = hex; });
+    renderAll();
+  };
+});
+
+linkBoth.onchange = function(){
+  if(this.checked){
+    // 勾選「共用」時，把右卡目前參數同步套用到左卡（形狀/強度共用，底色各自保留）
+    leftState.alpha = rightState.alpha;
+    leftState.k = rightState.k;
+    leftState.sigmaX = rightState.sigmaX;
+    leftState.sigmaY = rightState.sigmaY;
+    leftState.cx = rightState.cx;
+    leftState.cy = rightState.cy;
+    renderAll();
+  }
+};
+
+// ---- drag to move center, per-canvas ----
+function bindDrag(state){
+  var canvas = state.canvas;
+  function toLocal(e){
+    var rect = canvas.getBoundingClientRect();
+    var clientX = e.touches ? e.touches[0].clientX : e.clientX;
+    var clientY = e.touches ? e.touches[0].clientY : e.clientY;
+    return {
+      x: (clientX - rect.left) * (canvas.width / rect.width),
+      y: (clientY - rect.top) * (canvas.height / rect.height)
+    };
+  }
+  function start(e){
+    state.dragging = true;
+    canvas.classList.add('dragging');
+    move(e);
+    e.preventDefault();
+  }
+  function move(e){
+    if(!state.dragging) return;
+    var p = toLocal(e);
+    state.cx = Math.max(0, Math.min(canvas.width, p.x));
+    state.cy = Math.max(0, Math.min(canvas.height, p.y));
+    if(linkBoth.checked){
+      leftState.cx = state.cx; leftState.cy = state.cy;
+      rightState.cx = state.cx; rightState.cy = state.cy;
+    }
+    document.getElementById('cxVal').value = Math.round(state.cx);
+    document.getElementById('cyVal').value = Math.round(state.cy);
+    renderAll();
+    e.preventDefault();
+  }
+  function end(){
+    state.dragging = false;
+    canvas.classList.remove('dragging');
+  }
+  canvas.addEventListener('mousedown', start);
+  window.addEventListener('mousemove', move);
+  window.addEventListener('mouseup', end);
+  canvas.addEventListener('touchstart', start, {passive:false});
+  window.addEventListener('touchmove', move, {passive:false});
+  window.addEventListener('touchend', end);
+}
+bindDrag(leftState);
+bindDrag(rightState);
+
+syncControlsFrom(rightState);
+renderAll();
+</script>
+</body>
+</html>

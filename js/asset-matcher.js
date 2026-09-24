@@ -118,7 +118,15 @@ var AssetMatcher = (function(){
       presetColors: list,
       presetBgColor: list.length ? list[0].bg : undefined,
       presetTextColor: list.length ? list[0].text : undefined,
-      categoryKey: it.categoryKey
+      categoryKey: it.categoryKey,
+      // 2026-09：資料庫LOGO預設都是「原圖直接放」(logoMode:'original')，不會
+      // 加裁切+底色的膠囊色塊——因為資料庫裡的LOGO本來就是做好的固定素材，
+      // 不像使用者自己上傳的照片常常四周有雜亂留白需要裁切。但少數LOGO
+      // (例如品牌會員)本身圖檔比例跟版位的LOGO框不一樣，需要用裁切+底色
+      // 的膠囊模式包起來才好看，這種在json裡登記forceTrimMode:true，
+      // 不管是Excel匯入自動比對到、還是使用者自己手動瀏覽資料庫選到，都會
+      // 直接套用trim模式（含自動底色偵測，見modules/logo-module.js）。
+      forceTrimMode: !!it.forceTrimMode
     };
   }
 

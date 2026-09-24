@@ -119,10 +119,19 @@ window.Modules.logo = {
         var contentCx = (x0+x1+1)/2/sw*img.naturalWidth;
         var contentCy = (y0+y1+1)/2/sh*img.naturalHeight;
 
-        // 底色建議：PNG(有透明背景)固定白色；非PNG吸取「四邊」(不是四個角
-        // 的單一像素點)的底色平均，比較不會被邊角剛好一小塊留白影響
+        // 底色建議：PNG(有透明背景)固定白色；非PNG(例如JPG，本來就沒有透明
+        // 背景、四周一定是某個實色)吸取「四邊」(不是四個角的單一像素點)的
+        // 底色平均，比較不會被邊角剛好一小塊留白影響。
+        // 2026-09修бug：這裡原本只在slot.logoBgColor還沒設過值時才會抓色
+        // (if(!slot.logoBgColor))，導致「換了一張新LOGO圖」時，如果這一格
+        // 之前已經有底色（不管是舊圖留下的白色、還是舊圖抓到的邊緣色），
+        // 新圖永遠不會重新偵測、只會繼續沿用舊值——你反映的「換成JPG還是
+        // 白底、沒有自動吸四周顏色」就是這裡造成的。這個if本身是多餘的：
+        // 這整段本來就只在「換了新的logoRaw、還沒偵測過」時才會跑到
+        // (上面有__trimInitFor===slot.logoRaw的判斷擋掉重複偵測)，所以
+        // 底色本來就該跟著每一次換圖重新判斷，不用另外判斷「有沒有值」。
         var isPNG = /^data:image\/png/i.test(slot.logoRaw) || /\.png($|\?)/i.test(slot.logoRaw);
-        if(!slot.logoBgColor) slot.logoBgColor = isPNG ? '#ffffff' : Modules.logo._sampleEdgeColor(img);
+        slot.logoBgColor = isPNG ? '#ffffff' : Modules.logo._sampleEdgeColor(img);
 
         // 存「內容框的原圖尺寸」，不是存算好的縮放值——縮放值每次渲染時
         // 用當下zone的實際大小現算(見_computeLogoFit)，main畫面/放大編輯

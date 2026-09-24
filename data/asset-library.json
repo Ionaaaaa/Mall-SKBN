@@ -14,7 +14,7 @@
         {
           "id": "new-arrival-ootd_logo",
           "brand": "新品OOTD",
-          "name": "新品OOTD 造節LOGO",
+          "name": "新品OOTD",
           "type": "logo",
           "path": "system-elements/festival/new-arrival-ootd_logo.png",
           "matchKeys": [
@@ -27,7 +27,7 @@
         {
           "id": "shopee-mom-baby-expo_logo",
           "brand": "蝦皮婦幼展",
-          "name": "蝦皮婦幼展 造節LOGO",
+          "name": "蝦皮婦幼展",
           "type": "logo",
           "path": "system-elements/festival/shopee-mom-baby-expo_logo.png",
           "matchKeys": [
@@ -38,12 +38,34 @@
         {
           "id": "sweet-outfit-season_logo",
           "brand": "甜蜜穿搭季",
-          "name": "甜蜜穿搭季 造節LOGO",
+          "name": "甜蜜穿搭季",
           "type": "logo",
           "path": "system-elements/festival/sweet-outfit-season_logo.png",
           "matchKeys": [
             "甜蜜穿搭季",
             "穿搭季"
+          ]
+        },
+        {
+          "id": "3c-digital-expo_logo",
+          "brand": "3C資訊展",
+          "name": "3C資訊展",
+          "type": "logo",
+          "path": "system-elements/festival/3c-digital-expo_logo.png",
+          "matchKeys": [
+            "3C資訊展"
+          ],
+          "_note": "這張圖是純白色(只有透明度沒有顏色資訊)，只有放在深色/有顏色的背景上才看得到——跟festival分類原本的「依背景深淺自動判斷要不要強制白色」邏輯不一樣，這張本來就是白的，背景太淺的話logo會直接消失，需要的話要手動指定背景色。"
+        },
+        {
+          "id": "underwear-festival_logo",
+          "brand": "蝦皮內衣節",
+          "name": "蝦皮內衣節 造節LOGO",
+          "type": "logo",
+          "path": "system-elements/festival/underwear-festival_logo.png",
+          "matchKeys": [
+            "內衣節",
+            "蝦皮內衣節"
           ]
         }
       ]
@@ -54,7 +76,7 @@
         {
           "id": "44sale_logo",
           "brand": "4.4購物節",
-          "name": "4.4購物節 LOGO",
+          "name": "4.4購物節",
           "type": "logo",
           "path": "system-elements/site-wide-sale/44sale_logo.png"
         },
@@ -70,7 +92,7 @@
         {
           "id": "1010anniversary_logo",
           "brand": "10.10品牌週年慶",
-          "name": "10.10品牌週年慶 中間橫版LOGO",
+          "name": "10.10品牌週年慶",
           "type": "logo",
           "path": "system-elements/site-wide-sale/1010anniversary_logo.png",
           "matchKeys": [
@@ -78,14 +100,14 @@
             "10.10品牌週年慶\\01_LOGO",
             "10.10品牌週年慶/01_LOGO"
           ],
-          "_note": "檔案目前還沒上傳，路徑/檔名先登記好；等圖放進 system-elements/site-wide-sale/1010anniversary_logo.png 就會自動生效，不用改這份json",
+
           "presetBgColor": "#ee4e2e",
           "presetTextColor": "#fffd3e"
         },
         {
           "id": "mall25festival_logo",
           "brand": "商城25節",
-          "name": "商城25節 中間橫版LOGO（白字/無USP，每月25號重複使用）",
+          "name": "商城25節 ",
           "type": "logo",
           "path": "system-elements/site-wide-sale/mall25festival_logo.png",
           "matchKeys": [
@@ -100,7 +122,7 @@
         {
           "id": "99brandsale_logo",
           "brand": "99大促",
-          "name": "99大促 中間橫版LOGO",
+          "name": "99大促",
           "type": "logo",
           "path": "system-elements/site-wide-sale/99brandsale_logo.png",
           "matchKeys": [
@@ -115,7 +137,7 @@
         {
           "id": "618sale_logo",
           "brand": "618大促",
-          "name": "618全民年中慶 中間橫版LOGO（白字）",
+          "name": "618全民年中慶",
           "type": "logo",
           "path": "system-elements/site-wide-sale/618sale_logo.png",
           "matchKeys": [
@@ -140,19 +162,45 @@
         {
           "id": "shopee-official-store_logo",
           "brand": "蝦皮直營",
-          "name": "蝦皮直營 LOGO",
+          "name": "蝦皮直營",
           "type": "logo",
           "path": "system-elements/common/shopee-official-store_logo.png",
           "matchKeys": [
             "蝦皮直營",
             "Shopee直營"
+          ]
+        },
+        {
+          "id": "shopee-official-store-3c_logo",
+          "brand": "蝦皮直營3C家電",
+          "name": "蝦皮直營",
+          "type": "logo",
+          "path": "system-elements/common/shopee-official-store-3c_logo.png",
+          "matchKeys": [
+            "蝦皮直營3C家電",
+            "蝦皮直營 3C家電",
+            "蝦皮直營+3C家電"
           ],
-          "_note": "檔案目前還沒上傳，路徑/檔名先登記好；等圖放進 system-elements/common/shopee-official-store_logo.png 就會自動生效，不用改這份json"
+          "_note": "這張跟上面「蝦皮直營 LOGO」是不同檔——這張下面多印了「3C家電」一行副標，只適合3C家電類的檔期。目前的比對邏輯是「文字包含關鍵字」雙向比對品牌欄位，如果工單品牌欄位寫的文字同時含有「蝦皮直營」跟「3C家電」，可能會比對到上面那筆單純版而不是這筆——如果你們的工單真的會用到這個雙行版，麻煩告訴我實際工單會怎麼寫（例如LOGO欄位是不是會直接寫「蝦皮直營3C家電」或用路徑代碼\\的形式），我再調整比對規則或改用手動選擇比較保險。"
+        },
+        {
+          "id": "brand-member_logo",
+          "brand": "品牌會員",
+          "name": "品牌會員",
+          "type": "logo",
+          "path": "system-elements/common/brand-member_logo.jpg",
+          "matchKeys": [
+            "品牌會員"
+          ],
+          "presetBgColor": "#EE4D2D",
+          "presetTextColor": "#FFF600",
+          "forceTrimMode": true,
+          "_note": "特例：其他常見/造節LOGO從資料庫比對到都是直接放原圖(不加裁切/底色)，只有這筆額外開啟forceTrimMode——不管是Excel匯入自動比對到，還是使用者自己手動瀏覽資料庫選到，都會自動套用「裁切+底色」的膠囊模式。2026-09：改成jpg檔，這樣套用trim模式時底色會走「吸四周邊緣顏色」那條路徑(而不是PNG固定白色)，跟這張圖本身的紅底比較吻合。原本的system-elements/common/brand-member_logo.png沒有刪掉（這個環境沒有刪檔權限），資料庫已經沒有任何一筆指到它，等於是沒在用的舊檔，之後你可以自己手動刪掉。"
         },
         {
           "id": "limited-time-sale_logo",
           "brand": "限時特賣",
-          "name": "限時特賣 LOGO",
+          "name": "限時特賣",
           "type": "logo",
           "path": "system-elements/common/limited-time-sale_logo.png",
           "matchKeys": [
@@ -168,13 +216,45 @@
         {
           "id": "watsons_logo",
           "brand": "屈臣氏",
-          "name": "屈臣氏 Watsons LOGO",
+          "name": "屈臣氏 Watsons",
           "type": "logo",
           "path": "system-elements/common/watsons_logo.png",
           "matchKeys": [
             "屈臣氏",
             "Watsons"
           ]
+        },
+        {
+          "id": "beauty-health-store_logo",
+          "brand": "美妝保健館",
+          "name": "美妝保健館",
+          "type": "logo",
+          "path": "system-elements/common/beauty-health-store_logo.png",
+          "matchKeys": [
+            "美妝保健館"
+          ]
+        },
+        {
+          "id": "brand-flagship_logo",
+          "brand": "品牌旗艦",
+          "name": "品牌旗艦",
+          "type": "logo",
+          "path": "system-elements/common/brand-flagship_logo.png",
+          "matchKeys": [
+            "品牌旗艦"
+          ]
+        },
+        {
+          "id": "apple-authorized-reseller_logo",
+          "brand": "Apple授權經銷商",
+          "name": "Apple 授權經銷商",
+          "type": "logo",
+          "path": "system-elements/common/apple-authorized-reseller_logo.png",
+          "matchKeys": [
+            "Apple授權經銷商",
+            "Apple 授權經銷商"
+          ],
+          "_note": "這張圖是純白色(只有透明度沒有顏色資訊)，只有放在深色/有顏色的背景上才看得到，背景太淺的話logo會直接消失，需要的話要手動指定背景色。"
         }
       ]
     }
@@ -266,7 +346,7 @@
         {
           "id": "exclusive_product-coupon-x1",
           "brand": "直營",
-          "name": "直營優惠券 x1（文字位置見configs/material-text-style.js）",
+          "name": "直營優惠券 x1",
           "path": "artwork/site-wide-sale/exclusive_product-coupon-x1.png",
           "matchType": "直營券*1",
           "hasText": true
@@ -300,31 +380,41 @@
           "path": "artwork/common/demo-product.png"
         },
         {
-          "id": "limited-time-sale-yellow",
+          "id": "cfs-entertainment",
           "brand": "限時特賣",
-          "name": "限時特賣-黃",
+          "name": "限時特賣-娛樂",
           "path": "artwork/common/限時特賣-黃.png",
-          "matchType": "限時特賣-黃",
+          "matchType": "CFS-娛樂",
           "hasText": false,
-          "presetColor": { "bg": "#fd5401", "text": "#f9ff39" }
+          "presetColor": { "bg": "#fd5401", "text": "#f9ff39" },
+          "_note": "2026-09：原本用背景色命名(限時特賣-黃/藍/紅)，改成依工單實際帶入的名稱命名。這筆(橘底)對應CFS-娛樂。圖檔還是原本那個檔案(限時特賣-黃.png)，沒有換圖，只改matchType。"
         },
         {
-          "id": "limited-time-sale-blue",
+          "id": "cfs-3c",
           "brand": "限時特賣",
-          "name": "限時特賣-藍",
+          "name": "限時特賣-3C",
           "path": "artwork/common/限時特賣-藍.png",
-          "matchType": "限時特賣-藍",
+          "matchType": "CFS-3C",
           "hasText": false,
           "presetColor": { "bg": "#084cb1", "text": "#fce700" }
         },
         {
-          "id": "limited-time-sale-red",
+          "id": "cfs-lifestyle",
           "brand": "限時特賣",
-          "name": "限時特賣-紅",
+          "name": "限時特賣-生活用品",
           "path": "artwork/common/限時特賣-紅.png",
-          "matchType": "限時特賣-紅",
+          "matchType": "CFS-生活用品",
           "hasText": false,
           "presetColor": { "bg": "#d0011b", "text": "#fce700" }
+        },
+        {
+          "id": "vip-gift-box",
+          "brand": "VIP",
+          "name": "VIP禮物盒",
+          "path": "artwork/common/vip-gift-box.png",
+          "matchType": "品牌會員",
+          "hasText": false,
+          "_note": "工單裡這個素材帶入的名稱是「品牌會員」，跟常見LOGO清單裡的「品牌會員」LOGO同名——但兩邊是分開比對的(LOGO欄位vs素材欄位)，不會互相打架，所以同名沒問題。這張圖本身背後帶一圈淡淡的漸層光暈(不是實心色底)，透明度是漸變的，保留原檔沒有裁掉——當成這個素材自帶的光暈效果，疊在任何背景色上都能自然融合。如果之後想要完全去掉光暈、只留禮物盒本體，跟我說一聲再處理。"
         }
       ]
     }

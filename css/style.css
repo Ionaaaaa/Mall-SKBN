@@ -163,6 +163,10 @@ body{ font-family:"ShopeeNoto","Noto Sans TC","Microsoft JhengHei",sans-serif; b
 /* ── 資料庫圖示選擇：現在是 modal-settings 裡的 .library-face，本身不用
    額外定位樣式(繼承.library-face的絕對定位鋪滿)，這裡只保留內部排版樣式 ── */
 .library-drawer-body{ flex:1; overflow-y:auto; }
+.lib-search-wrap{ position:sticky; top:0; z-index:1; background:var(--panel, var(--surface)); padding-bottom:8px; margin-bottom:4px; }
+.lib-search-input{ width:100%; height:34px; box-sizing:border-box; padding:0 10px; font-size:12px;
+  border:1px solid var(--border); border-radius:8px; background:var(--bg); color:var(--text); }
+.lib-search-input:focus{ outline:none; border-color:var(--accent); }
 .lib-grid{ display:grid; grid-template-columns:repeat(2,1fr); gap:10px; margin-bottom:6px; }
 .lib-card{ background:var(--surface); border:1px solid var(--border); border-radius:8px; padding:8px; cursor:pointer;
   display:flex; flex-direction:column; gap:6px; align-items:center; text-align:center; }
