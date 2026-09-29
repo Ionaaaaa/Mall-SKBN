@@ -20,17 +20,33 @@ window.ShadowPlugin = (function () {
   // 這組），另外新增了尾端模糊(tailBlur系列，跟shopee-3c-appliance-report那邊同一套
   // 做法)、「中」角度的柔霧主陰影(topMainShadowAlpha)、以及接地陰影改成「碰地線上下
   // 各展開一段+左右橫向模糊」，都是你在模擬器上調出來的。
+  /* 2026-09你抓到一個更根本的問題：soft/tailBlur/contactUpPx/contactDownPx/
+     contactBlurX這五個原本都是寫死的「絕對px」，跟商品實際畫多大完全沒關係。
+     你在測試工具上用細長商品調出一組數字，套在寬扁商品上「往後」那段陰影
+     幾乎完全消失(或反過來糊成一片)——因為這幾個px值不會隨商品尺寸縮放，
+     細長商品通常比較高(ph大)，同一個px值相對商品本身就顯得小/淡；寬扁商品
+     矮(ph小)，同一個px值相對就顯得誇張/過量。
+     改法：這五個都改成「佔商品尺寸的百分比」，畫的時候即時乘回商品當下的
+     pw/ph，同一組百分比不管商品多大多扁多瘦都會維持相同的視覺比例：
+       softPct/tailBlurPct/contactUpPct/contactDownPct：吃ph(商品高度)，
+       跟shear*ph、squash*ph這些原本就用ph當基準的項目一致；
+       contactBlurXPct：吃pw(商品寬度)，因為這是「左右橫向」模糊的幅度，
+       比照寬度縮放比較合理。
+     ⚠ 下面這組百分比是拿你目前這份「細長商品」校正值(soft4/tailBlur17/
+     contactUp4/contactDown2/contactBlurX3)，假設測試工具當時那顆細長商品
+     大約是ph≈260px(工具畫布的高度上限)、pw≈150px反推回來的暫定值，不是
+     你實際測過的百分比——等你用新版測試工具(已經改成百分比滑桿，而且會
+     即時顯示商品目前的pw/ph)分別對細長跟寬扁商品重新調過、確認兩種形狀
+     看起來都一致之後，再把最終百分比套進來這裡。 */
   var FIXED = {
-    // 2026-09再微調一次（同一顆skbn-shadow-test.html模擬器）：soft/fade/occlude/squash
-    // 這組再調過一輪
-    soft: 4,
+    softPct: 1.5,     // 原soft:4，估算基準ph≈260
     fade: 82,
     occlude: 0,
     squash: 0.41,
     // 尾端模糊：根部維持清楚邊緣，越往尾端越換成模糊版本，避免商品輪廓頂端留下一條銳利硬邊
     tailMid: 0.34,
-    tailMidAlpha: 1,
-    tailBlur: 17,
+    tailMidAlpha: 0.68,
+    tailBlurPct: 6.5, // 原tailBlur:17，估算基準ph≈260
     tailBlurStart: 0.27,
     tailBlurSpan: 0.36,
     // 「中」角度（光源正上方、無斜切）原本完全不畫主陰影，只留最下面的接地陰影，
@@ -39,11 +55,10 @@ window.ShadowPlugin = (function () {
     topMainShadowAlpha: 0.15,
     // 接地陰影：從商品實際碰到地面那條線，往上(疊在商品自己底部)、往下(貼合輪廓的細線)
     // 各展開一段，兩段拼成一條再套左右橫向模糊，做法跟舊版CONTACT_GROW_PX/0.55完全不同
-    // 2026-09再調整：往上/往下改成對稱各3px（原本4/2），橫向模糊也加大一點
-    contactUpPx: 3,
-    contactDownPx: 3,
+    contactUpPct: 1.5,    // 原contactUpPx:4，估算基準ph≈260
+    contactDownPct: 0.8,  // 原contactDownPx:2，估算基準ph≈260
     contactAlpha: 0.7,
-    contactBlurX: 5
+    contactBlurXPct: 2    // 原contactBlurX:3，估算基準pw≈150
   };
   var ANGLE_PRESETS = { left: -35, top: 0, right: 35 };
 
@@ -309,10 +324,11 @@ window.ShadowPlugin = (function () {
        groundAnchorX/groundAnchorY(商品原始、沒有加位移的位置)進來，接地陰影
        這段專門吃這組值；沒有帶的話(例如代言人光暈那邊、或舊版呼叫端)就退回
        用cx/groundY，跟以前行為一樣，不會壞掉。 */
-    if (!rot && (FIXED.contactUpPx > 0 || FIXED.contactDownPx > 0) && FIXED.contactAlpha > 0) {
+    var upPx = FIXED.contactUpPct / 100 * ph;
+    var downPx = FIXED.contactDownPct / 100 * ph;
+    if (!rot && (upPx > 0 || downPx > 0) && FIXED.contactAlpha > 0) {
       var trueCx = (state.groundAnchorX != null) ? state.groundAnchorX : cx;
       var trueGroundY = (state.groundAnchorY != null) ? state.groundAnchorY : (py - trimBottomPad);
-      var upPx = FIXED.contactUpPx, downPx = FIXED.contactDownPx;
       var bw = Math.ceil(pw) + 2, bh = Math.ceil(upPx + downPx) + 2;
       var imgYInTemp = trimBottomPad - ph + upPx; // p.tinted畫在temp canvas裡的y位置，讓輪廓真正的接地邊緣對齊temp的第upPx列
 
@@ -347,7 +363,7 @@ window.ShadowPlugin = (function () {
       comCtx.drawImage(aboveCanvas, 0, 0);
       comCtx.drawImage(belowCanvas, 0, 0);
 
-      var combinedBlurred = blurHorizontalOnly(combinedContact, FIXED.contactBlurX);
+      var combinedBlurred = blurHorizontalOnly(combinedContact, FIXED.contactBlurXPct / 100 * pw);
       ctx.save();
       ctx.globalCompositeOperation = 'multiply';
       ctx.globalAlpha = FIXED.contactAlpha;
@@ -356,7 +372,7 @@ window.ShadowPlugin = (function () {
     }
 
     var angle = opts.angle * Math.PI / 180;
-    var soft = FIXED.soft;
+    var soft = FIXED.softPct / 100 * ph;
     var fadeMul = FIXED.fade / 100;
     var occludeStrength = FIXED.occlude / 100;
     var shear = Math.tan(angle * 0.55);
@@ -420,13 +436,14 @@ window.ShadowPlugin = (function () {
          尾端越換成模糊版本，尾巴才不會在商品輪廓頂端留下一條銳利硬邊。
          tailBlur=0時整段不執行，畫面跟原本完全一樣。做法照抄
          shopee-3c-appliance-report專案shadow-plugin.js同一套。 */
-      if (FIXED.tailBlur > 0) {
+      var tailBlurPx = FIXED.tailBlurPct / 100 * ph;
+      if (tailBlurPx > 0) {
         var bs = Math.max(0, Math.min(0.9, FIXED.tailBlurStart));
         var be = Math.min(1, bs + Math.max(0.05, FIXED.tailBlurSpan));
         var blurred = document.createElement('canvas');
         blurred.width = tempW; blurred.height = tempH;
         var bctx = blurred.getContext('2d');
-        bctx.filter = 'blur(' + FIXED.tailBlur + 'px)';
+        bctx.filter = 'blur(' + tailBlurPx + 'px)';
         bctx.drawImage(tmp, 0, 0);
         bctx.filter = 'none';
         var gb = bctx.createLinearGradient(anchorX, anchorY, anchorX + tipX, anchorY + tipY);

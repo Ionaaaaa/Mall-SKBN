@@ -320,7 +320,14 @@ window.Modules.product = {
       x:anchorX, y:anchorY, w:drawW, h:drawH,
       drawX:drawX, drawY:drawY, drawW:drawW, drawH:drawH,
       tight: tight,
-      groundY: tight.y + tight.h // 有色內容的實際底邊，陰影/接地效果用這個當基準，不是anchorY
+      groundY: tight.y + tight.h, // 有色內容的實際底邊，陰影/接地效果用這個當基準，不是anchorY
+      /* 2026-09新增：給ShadowPlugin的模糊/接地陰影百分比當基準用的「設計目標
+         尺寸」——細長商品是「高度」撐滿boxH*fitRatio(但寬度撐不滿boxW)，寬扁
+         商品是「寬度」撐滿boxW*fitRatio(但高度撐不到boxH)，兩種商品各自的
+         實際w/h不一樣高/不一樣寬，但這裡的refW/refH永遠等於「如果撐滿會是
+         多大」，不管商品長怎樣都固定，讓模糊/接地陰影百分比套用同一組數字時
+         視覺粗細一致，不會因為某個形狀的商品自己縮得比較小而跟著變淡變薄。 */
+      refW: boxW*fitRatio, refH: boxH*fitRatio
     };
   },
 
@@ -441,7 +448,7 @@ window.Modules.product = {
            groundAnchorX/Y(商品沒加位移的原始接地位置)給shadow-plugin.js，
            它會專門拿這組值去算接地陰影的位置，x/y(shx/shy，已經加了位移)還是
            照舊給主陰影/柔霧用。 */
-        ShadowPlugin.renderScene(ctx, [{ id:registeredId, x:shx, y:shy, w:fit.w, h:fit.h, groundAnchorX: fit.x, groundAnchorY: fit.groundY }], true);
+        ShadowPlugin.renderScene(ctx, [{ id:registeredId, x:shx, y:shy, w:fit.w, h:fit.h, groundAnchorX: fit.x, groundAnchorY: fit.groundY, refW: fit.refW, refH: fit.refH }], true);
       }
 
       // 商品照片＋券樣文字：繞著選取框中心旋轉（陰影不轉，維持貼地）
@@ -659,7 +666,7 @@ window.Modules.product = {
           var shy = absAnchorY + (slot.shadowOffsetY||0)*z.h;
           // 跟redraw()那邊同一個道理：接地陰影固定用absAnchorX/Y(沒加位移)，
           // 主陰影/柔霧才吃shx/shy(加了位移)。
-          ShadowPlugin.renderScene(ctx, [{ id:id, x:shx, y:shy, w:fit.w, h:fit.h, groundAnchorX: absAnchorX, groundAnchorY: absAnchorY }], true);
+          ShadowPlugin.renderScene(ctx, [{ id:id, x:shx, y:shy, w:fit.w, h:fit.h, groundAnchorX: absAnchorX, groundAnchorY: absAnchorY, refW: fit.refW, refH: fit.refH }], true);
         }
 
         var t = fit.tight;

@@ -170,10 +170,11 @@ var ColorUtils = (function(){
      0.29），拿掉hue/飽和度的調整，只調明度，同一套公式可以套用在
      任何底色（不用為每張卡片寫死一個陰影色，底色換了陰影色自動跟著算）。
      2026-09再調深一次：你反饋套用新的soft/fade/occlude數字後陰影顏色
-     看起來太淺，改成k=0.4（壓暗比例從29%提高到40%），同色相/飽和度
-     不變，用法對稱lightenForGlow的k（GLOW.k）。 */
+     看起來太淺，先改成k=0.4，還是覺得太淺，再拿實際底色(#fe9116)試算
+     幾組給你選，最後採用k=0.6（壓暗比例60%），同色相/飽和度不變，
+     用法對稱lightenForGlow的k（GLOW.k）。 */
   function darkenForShadow(hex, k){
-    if(k == null) k = 0.4;
+    if(k == null) k = 0.6;
     var hsl = hexToHsl(hex);
     var l2 = hsl.l * (1 - k);
     return hslToHex(hsl.h, hsl.s, l2);

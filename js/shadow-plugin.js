@@ -20,31 +20,42 @@ window.ShadowPlugin = (function () {
   // 這組），另外新增了尾端模糊(tailBlur系列，跟shopee-3c-appliance-report那邊同一套
   // 做法)、「中」角度的柔霧主陰影(topMainShadowAlpha)、以及接地陰影改成「碰地線上下
   // 各展開一段+左右橫向模糊」，都是你在模擬器上調出來的。
+  /* 2026-09你抓到一個更根本的問題：soft/tailBlur/contactUpPx/contactDownPx/
+     contactBlurX這五個原本都是寫死的「絕對px」，跟商品實際畫多大完全沒關係。
+     你在測試工具上用細長商品調出一組數字，套在寬扁商品上「往後」那段陰影
+     幾乎完全消失(或反過來糊成一片)——因為這幾個px值不會隨商品尺寸縮放，
+     細長商品通常比較高(ph大)，同一個px值相對商品本身就顯得小/淡；寬扁商品
+     矮(ph小)，同一個px值相對就顯得誇張/過量。
+     改法：這五個都改成「佔商品尺寸的百分比」，畫的時候即時乘回商品當下的
+     pw/ph，同一組百分比不管商品多大多扁多瘦都會維持相同的視覺比例：
+       softPct/tailBlurPct/contactUpPct/contactDownPct：吃ph(商品高度)，
+       跟shear*ph、squash*ph這些原本就用ph當基準的項目一致；
+       contactBlurXPct：吃pw(商品寬度)，因為這是「左右橫向」模糊的幅度，
+       比照寬度縮放比較合理。
+     下面這組百分比數字，是拿你給的「細長商品」校正值(soft4/tailBlur17/
+     contactUp4/contactDown2/contactBlurX3)，用ph≈260/pw≈150反推回來的。
+     ⚠ 2026-09你一度提出「同一版位塞不同形狀商品」的refH/refW修正（百分比
+     改吃版位目標尺寸而不是商品自己的pw/ph），試過之後你反饋「越來越糟糕」，
+     已經整個退回：現在跟以前一樣，百分比單純吃商品自己當下的pw/ph，不管
+     版位/refH/refW這件事——先求單一商品尺寸下視覺正確，形狀差異的問題
+     之後再說。 */
   var FIXED = {
-    // 2026-09你在skbn-shadow-test.html上重新校過、直接給我的完整數值（斜射主陰影
-    // 這組+接地陰影+中角度主陰影強度），中間我自己試著把tailBlur往下調想解決
-    // 「糊到看不到」的問題，但你確認過那個問題其實不是斜射陰影的tailBlur造成的，
-    // 這裡整組改回你這次給的原始數值，不要再自己降tailBlur。
-    soft: 4,
+    softPct: 1.5,     // 原soft:4，估算基準ph≈260
     fade: 82,
     occlude: 0,
     squash: 0.41,
     // 尾端模糊：根部維持清楚邊緣，越往尾端越換成模糊版本，避免商品輪廓頂端留下一條銳利硬邊
     tailMid: 0.34,
     tailMidAlpha: 0.68,
-    tailBlur: 17,
+    tailBlurPct: 6.5, // 原tailBlur:17，估算基準ph≈260
     tailBlurStart: 0.27,
     tailBlurSpan: 0.36,
-    // 「中」角度（光源正上方、無斜切）原本完全不畫主陰影，只留最下面的接地陰影，
-    // 同事反饋看不到——這個是新加的柔霧強度，0=跟以前一樣完全不畫，拉高會在商品
-    // 正下方疊一片放大+壓扁+模糊過的柔和陰影，沒有方向性
-    topMainShadowAlpha: 0.15,
     // 接地陰影：從商品實際碰到地面那條線，往上(疊在商品自己底部)、往下(貼合輪廓的細線)
     // 各展開一段，兩段拼成一條再套左右橫向模糊，做法跟舊版CONTACT_GROW_PX/0.55完全不同
-    contactUpPx: 4,
-    contactDownPx: 2,
+    contactUpPct: 1.5,    // 原contactUpPx:4，估算基準ph≈260
+    contactDownPct: 0.8,  // 原contactDownPx:2，估算基準ph≈260
     contactAlpha: 0.7,
-    contactBlurX: 3
+    contactBlurXPct: 2    // 原contactBlurX:3，估算基準pw≈150
   };
   var ANGLE_PRESETS = { left: -35, top: 0, right: 35 };
 
@@ -310,10 +321,11 @@ window.ShadowPlugin = (function () {
        groundAnchorX/groundAnchorY(商品原始、沒有加位移的位置)進來，接地陰影
        這段專門吃這組值；沒有帶的話(例如代言人光暈那邊、或舊版呼叫端)就退回
        用cx/groundY，跟以前行為一樣，不會壞掉。 */
-    if (!rot && (FIXED.contactUpPx > 0 || FIXED.contactDownPx > 0) && FIXED.contactAlpha > 0) {
+    var upPx = FIXED.contactUpPct / 100 * ph;
+    var downPx = FIXED.contactDownPct / 100 * ph;
+    if (!rot && (upPx > 0 || downPx > 0) && FIXED.contactAlpha > 0) {
       var trueCx = (state.groundAnchorX != null) ? state.groundAnchorX : cx;
       var trueGroundY = (state.groundAnchorY != null) ? state.groundAnchorY : (py - trimBottomPad);
-      var upPx = FIXED.contactUpPx, downPx = FIXED.contactDownPx;
       var bw = Math.ceil(pw) + 2, bh = Math.ceil(upPx + downPx) + 2;
       var imgYInTemp = trimBottomPad - ph + upPx; // p.tinted畫在temp canvas裡的y位置，讓輪廓真正的接地邊緣對齊temp的第upPx列
 
@@ -348,7 +360,7 @@ window.ShadowPlugin = (function () {
       comCtx.drawImage(aboveCanvas, 0, 0);
       comCtx.drawImage(belowCanvas, 0, 0);
 
-      var combinedBlurred = blurHorizontalOnly(combinedContact, FIXED.contactBlurX);
+      var combinedBlurred = blurHorizontalOnly(combinedContact, FIXED.contactBlurXPct / 100 * pw);
       ctx.save();
       ctx.globalCompositeOperation = 'multiply';
       ctx.globalAlpha = FIXED.contactAlpha;
@@ -357,41 +369,21 @@ window.ShadowPlugin = (function () {
     }
 
     var angle = opts.angle * Math.PI / 180;
-    var soft = FIXED.soft;
+    var soft = FIXED.softPct / 100 * ph;
     var fadeMul = FIXED.fade / 100;
     var occludeStrength = FIXED.occlude / 100;
     var shear = Math.tan(angle * 0.55);
     var maxSpread = soft * 1.8;
 
-    /* 2026-08 原本的做法：光源角度選「中」（光源正上方、angle=0、完全沒有
-       斜切）時，只要接地補強陰影那一小條就好，不要再疊主斜切陰影——主斜切
-       陰影在angle=0時視覺上就是一坨直直往下的模糊陰影，跟接地陰影疊在一起
-       反而顯得厚重/多餘，所以選「中」乾脆整段跳過，只留最單純的接地陰影。
-       2026-09跟你確認：這樣同事會反饋「中」角度看不到陰影，改成新做法——
-       試過直接沿用左右版位的斜切演算法但angle=0時形狀會整團疊在商品正
-       下方、被商品本身完全蓋住，所以改成：拿商品輪廓放大、壓扁、模糊化，
-       變成一片柔和的「陰影窪地」墊在商品下方，邊緣從身形兩側露出來才看
-       得到，沒有方向性(不是左右斜切，純粹加強存在感)。topMainShadowAlpha
-       是這片柔霧的強度，拉到0就是完全跟以前一樣不畫。 */
+    /* 2026-08 光源角度選「中」（光源正上方、angle=0、完全沒有斜切）時，只要
+       接地補強陰影那一小條就好，不要再疊主斜切陰影——主斜切陰影在angle=0時
+       視覺上就是一坨直直往下的模糊陰影，跟接地陰影疊在一起反而顯得厚重/多餘，
+       所以選「中」整段跳過主陰影，只留最單純的接地陰影。
+       2026-09一度加過一個「topMainShadowAlpha」柔霧主陰影(拿商品輪廓放大/
+       壓扁/模糊墊在商品下方)，你試過之後反饋「越來越糟糕」，已經整個拿掉、
+       退回原本「中角度只留接地陰影」的做法，不再有這個參數。 */
     var isTop = (opts.presetName === 'top');
-    if (isTop) {
-      if (FIXED.topMainShadowAlpha > 0) {
-        var haloW = spw * 1.28;
-        var haloH = sph * squash * 1.7;
-        var haloBlurPx = Math.max(2, soft * 1.1);
-        var htmp = document.createElement('canvas');
-        htmp.width = ctx.canvas.width; htmp.height = ctx.canvas.height;
-        var hctx = htmp.getContext('2d');
-        hctx.filter = 'blur(' + haloBlurPx + 'px)';
-        hctx.drawImage(p.tinted, shadowCx - haloW / 2, shadowGroundY - haloH, haloW, haloH);
-        hctx.filter = 'none';
-        ctx.save();
-        ctx.globalCompositeOperation = 'multiply';
-        ctx.globalAlpha = FIXED.topMainShadowAlpha;
-        ctx.drawImage(htmp, 0, 0);
-        ctx.restore();
-      }
-    } else {
+    if (!isTop) {
       var halfW = spw / 2 + Math.abs(shear) * sph + maxSpread * 2 + 20;
       var tempW = Math.ceil(halfW * 2);
       var tempH = Math.ceil(sph * squash * 2 + maxSpread * 2 + 40);
@@ -414,30 +406,43 @@ window.ShadowPlugin = (function () {
         tctx.restore();
       }
 
-      var tipX = -shear * sph * fadeMul;
+      /* ⚠ 2026-09你抓到的bug：尾端淡出的漸層原本用(anchorX+tipX, anchorY+tipY)
+         這條斜線當漸層軸——tipX是shear*sph算出來的，跟商品「寬度」完全無關，
+         但漸層的方向卻同時有X跟Y分量，導致同一列(row)裡，離錨點X越遠的像素
+         (也就是商品越寬、離中心越遠的部分)，投影到這條斜線上的t值也跟著跑，
+         寬商品左右兩側還沒開始往後延伸，投影就已經算到接近1(全透明)，等於
+         寬商品的陰影還沒真的「畫出多遠」，光是自己的寬度就先把自己淡出去了
+         ——這就是為什麼細長商品的尾巴還看得到、寬扁商品的陰影卻整個消失。
+         修法：漸層改成純垂直方向(只留tipY，拿掉tipX)。因為stampLayer裡的
+         transform(1,0,shear,squash,0,0)讓canvas的Y座標本來就只吃squash*y，
+         跟X完全無關(shear只影響X)──也就是說「同一個canvasY」對應的本來就是
+         商品輪廓上「同一個高度」，不管那一列多寬。改成純垂直漸層後，淡出程度
+         只跟「這個點原本在商品輪廓上多高」有關，同一列不管多寬都用同一個透明度，
+         寬扁商品跟細長商品的尾巴淡出速度才會一致。 */
       var tipY = -squash * sph * fadeMul - soft * 0.6;
 
       /* 2026-09新增：尾端漸進模糊。根部維持原本較清楚的邊緣(接地感)，越往
          尾端越換成模糊版本，尾巴才不會在商品輪廓頂端留下一條銳利硬邊。
          tailBlur=0時整段不執行，畫面跟原本完全一樣。做法照抄
          shopee-3c-appliance-report專案shadow-plugin.js同一套。 */
-      if (FIXED.tailBlur > 0) {
+      var tailBlurPx = FIXED.tailBlurPct / 100 * ph;
+      if (tailBlurPx > 0) {
         var bs = Math.max(0, Math.min(0.9, FIXED.tailBlurStart));
         var be = Math.min(1, bs + Math.max(0.05, FIXED.tailBlurSpan));
         var blurred = document.createElement('canvas');
         blurred.width = tempW; blurred.height = tempH;
         var bctx = blurred.getContext('2d');
-        bctx.filter = 'blur(' + FIXED.tailBlur + 'px)';
+        bctx.filter = 'blur(' + tailBlurPx + 'px)';
         bctx.drawImage(tmp, 0, 0);
         bctx.filter = 'none';
-        var gb = bctx.createLinearGradient(anchorX, anchorY, anchorX + tipX, anchorY + tipY);
+        var gb = bctx.createLinearGradient(anchorX, anchorY, anchorX, anchorY + tipY);
         gb.addColorStop(0, 'rgba(255,255,255,0)');
         gb.addColorStop(bs, 'rgba(255,255,255,0)');
         gb.addColorStop(be, 'rgba(255,255,255,1)');
         gb.addColorStop(1, 'rgba(255,255,255,1)');
         bctx.globalCompositeOperation = 'destination-in';
         bctx.fillStyle = gb; bctx.fillRect(0, 0, tempW, tempH);
-        var gs = tctx.createLinearGradient(anchorX, anchorY, anchorX + tipX, anchorY + tipY);
+        var gs = tctx.createLinearGradient(anchorX, anchorY, anchorX, anchorY + tipY);
         gs.addColorStop(0, 'rgba(255,255,255,1)');
         gs.addColorStop(bs, 'rgba(255,255,255,1)');
         gs.addColorStop(be, 'rgba(255,255,255,0)');
@@ -457,7 +462,7 @@ window.ShadowPlugin = (function () {
       }
 
       tctx.globalCompositeOperation = 'destination-in';
-      var grad = tctx.createLinearGradient(anchorX, anchorY, anchorX + tipX, anchorY + tipY);
+      var grad = tctx.createLinearGradient(anchorX, anchorY, anchorX, anchorY + tipY);
       grad.addColorStop(0, 'rgba(255,255,255,1)');
       grad.addColorStop(FIXED.tailMid, 'rgba(255,255,255,' + FIXED.tailMidAlpha + ')');
       grad.addColorStop(1, 'rgba(255,255,255,0)');
