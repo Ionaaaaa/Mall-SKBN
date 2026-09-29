@@ -99,13 +99,23 @@ function parseWorkOrder(rows){
       } else {
         slot.bgColor = null; // 「不指定」或空白 → 之後自動配色（見 resolveAndApplyBanners）
       }
+      // 記下「Excel當下有沒有指定背景色」這個當下狀態，之後applyAutoBackground
+      // 不管走哪個分支都會把slot.bgColor填成非空值，事後就分不出來是Excel
+      // 指定的還是系統自動配的了——這個旗標就是留給放大編輯視窗的狀態摘要
+      // 用（顯示「底色:指定色/系統配色」），不會被之後任何流程覆蓋。
+      slot._importBgColorSpecified = !!slot.bgColor;
 
       slot._importLogoRaw = String(row[b.logo]||'').trim();
+
+      // 掛標欄原始文字也記下來（給放大編輯視窗的狀態摘要用），跟下面的
+      // tagVariant判斷分開存，這樣事後使用者手動改了tagVariant，摘要仍然
+      // 能顯示「工單當初到底有沒有要掛標」這個原始事實。
+      slot._importTagRaw = String(row[b.tag]||'').trim();
 
       // 掛標欄寫「無」→ 明確不需要掛標，直接關掉（跟背景色深淺自動判斷分開處理，
       // 使用者事後還是可以在放大編輯面板手動切回「自動/白/紅」）。寫其他值
       // （例如「商城」「商城券*1」）維持預設'auto'，不動既有的自動判斷邏輯。
-      if(String(row[b.tag]||'').trim() === '無') slot.tagVariant = 'off';
+      if(slot._importTagRaw === '無') slot.tagVariant = 'off';
 
       var artType = String(row[b.artType]||'').trim();
       slot._importArtType = artType;

@@ -151,6 +151,18 @@ body{ font-family:"ShopeeNoto","Noto Sans TC","Microsoft JhengHei",sans-serif; b
 .angle-btn.active{ background:var(--accent); border-color:var(--accent); color:#fff; }
 .hint-sm{ font-size:11px; color:#666; line-height:1.6; }
 
+/* 放大編輯視窗左下角的工單狀態摘要（掛標/LOGO/底色/曝品區），永遠顯示
+   不隨分頁切換消失，所以刻意做得比一般hint-sm更小更淡，不搶視覺。一項
+   一行(import-status-row)，比逗號串成一行好掃。 */
+.import-status-sm{ margin-top:auto; padding-top:10px; border-top:1px solid var(--border);
+  display:flex; flex-direction:column; gap:4px; font-size:10px; color:#777; }
+.import-status-row{ display:flex; align-items:center; justify-content:space-between; gap:8px; }
+.import-status-row > span:first-child{ flex:none; color:#888; }
+.import-status-row > span:last-child{ text-align:right; word-break:break-all; }
+.status-icon-yes, .status-icon-no{ width:13px; height:13px; flex:none; }
+.status-icon-yes{ color:#2ecc71; }
+.status-icon-no{ color:#888; }
+
 /* 放大編輯視窗顏色選擇器下方的「常用配色」快捷色票：純色塊，不寫名稱，
    外層方塊=背景色，中間圓點=文字色，點一下同時套用兩者，不用另外記色碼。 */
 .preset-color-row{ display:flex; flex-wrap:wrap; gap:8px; }

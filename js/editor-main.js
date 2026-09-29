@@ -195,13 +195,55 @@ function cloneSlotForEdit(slot){
   return copy;
 }
 
+/* 中／左／右三格各自預設要先展開LOGO資料庫的哪個分類：中間版位常用來放
+   全站大促的LOGO，左右兩邊常用來放造節LOGO——跟你確認過的慣例，開資料庫
+   瀏覽視窗時手風琴直接展開對的分類，不用每次自己再點一次切換。 */
+function logoDefaultCategoryFor(key){
+  return key === 'mid' ? '全站大促' : '造節';
+}
+
 function openExpandModal(banner, key){
   closeModal();
   var realSlot = banner[key];
   var slot = cloneSlotForEdit(realSlot);
   var cfg = Core.layoutFor(key);
-  _modalCtx = { banner:banner, key:key, slot:slot, realSlot:realSlot, cfg:cfg, activeTab:'product', scale: computeModalScale(cfg), undoStack:[], lastSnapshot:null };
+  _modalCtx = {
+    banner:banner, key:key, slot:slot, realSlot:realSlot, cfg:cfg, activeTab:'product',
+    scale: computeModalScale(cfg), undoStack:[], lastSnapshot:null,
+    // 開啟當下先記一筆「這一格原本的LOGO」，供confirmModal判斷使用者是不是
+    // 剛把一個代補中的LOGO換掉——要用這個「原始值」去找其他還是代補中的
+    // 相同LOGO，不能用確認後的新值找（那時候這一格自己已經改掉了）。
+    origLogoRaw: realSlot.logoRaw,
+    // Excel那一欄原始寫的LOGO文字(不管有沒有比對成功都會留著，見
+    // editor-import.js)，給confirmModal判斷「其他格子是不是也寫了同一個
+    // 代碼、卻整個沒比對到路徑」用（見findSlotsNeedingSameLogoFix）。
+    origImportLogoRaw: realSlot._importLogoRaw,
+    // 2026-09新增：LOGO一開始就是好的（不是代補中），使用者只是單純改了
+    // 底色，這種情況也要能問「其他用同一顆LOGO的格子要不要一起換底色」
+    // ——判斷方式跟上面代補LOGO那組不一樣，是拿「關閉前vs關閉後」的底色
+    // 做比較，不是看LOGO是不是換了，所以另外記一份原始底色。
+    origBgColor: realSlot.bgColor,
+    origTitleColor: realSlot.titleColor,
+    origLogoBgColor: realSlot.logoBgColor,
+    // 2026-09修bug：原本只看realSlot.__logoLoadFailed這個「被動」的旗標——
+    // 但那個旗標要等主畫面小格子自己載入圖片失敗過一次才會被設成true，如果
+    // 使用者匯入後馬上點放大編輯(還沒等主畫面那張圖真的載入/失敗)，這裡讀到
+    // 的就會是還沒更新的舊值(通常是undefined)，導致「換好之後問要不要同步
+    // 其他格子」整個不會觸發——你反映的「這兩個更新沒發現」很可能就是這個
+    // 時間差造成的。改成主動探測一次：不管realSlot.__logoLoadFailed現在是
+    // 什麼，都自己起一張Image()去試載入原本的路徑，用真正的載入結果覆蓋
+    // origLogoMissing，才不會被「主畫面還沒來得及跑」卡住判斷錯誤。
+    origLogoMissing: !!realSlot.__logoLoadFailed
+  };
   _modalCtx.lastSnapshot = snapshotSlot(slot);
+
+  (function(ctx){
+    if(!ctx.origLogoRaw) return;
+    var probe = new Image();
+    probe.onload = function(){ if(_modalCtx === ctx) ctx.origLogoMissing = false; };
+    probe.onerror = function(){ if(_modalCtx === ctx) ctx.origLogoMissing = true; };
+    probe.src = ctx.origLogoRaw;
+  })(_modalCtx);
 
   var overlay = document.createElement('div');
   overlay.id = 'modal-overlay';
@@ -428,6 +470,58 @@ function buildMaterialTextFieldsHTML(slot){
   return html;
 }
 
+/* 勾/叉用實心icon畫，不要直接寫「勾」「叉」這兩個字——跟其他icon-btn
+   共用同一套svg風格(viewBox 16x16, stroke currentColor)，勾用綠色、
+   叉用灰色(不是紅色警示，只是「這格目前沒有」的中性狀態，不是錯誤)。 */
+function statusCheckIcon(ok){
+  var path = ok ? '<path d="M3 8.5l3.2 3.2L13 4.3"/>' : '<path d="M4 4l8 8M12 4l-8 8"/>';
+  var cls = ok ? 'status-icon-yes' : 'status-icon-no';
+  return '<svg class="'+cls+'" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2">'+path+'</svg>';
+}
+
+/* 放大編輯視窗左下角的小狀態摘要——目的是讓人一眼看出「工單當初到底
+   要求這格長怎樣」，不用切來切去三個分頁自己拼湊。四項都是從匯入資料
+   (_import*欄位，見editor-import.js)或目前狀態算出來，不受分頁切換影響，
+   所以放在buildModalObjectsHTML最後、三個obj-panel外面，永遠顯示。
+   一項一行(不是逗號串在一起)，比較好掃過去看。
+     掛標：這個版位有沒有掛標欄位(cfg.tagZone)才顯示，勾/叉看目前
+       tagVariant是不是'off'。
+     LOGO：目前這一格是不是已經有可用的LOGO來源(logoRaw)。
+     底色：靠slot._importBgColorSpecified分辨是Excel當初就寫死的顏色，
+       還是系統自動配色/抓色——這個旗標在匯入當下就固定了，之後
+       applyAutoBackground不管走哪個分支都不會回頭改寫它。
+     曝品區：直接顯示原始工單文字(_importArtType + 內容/素材種類)，
+       這欄匯入後不會被覆蓋，是最貼近「工單原文」的欄位。 */
+function computeImportStatusHTML(slot, cfg){
+  var rows = [];
+
+  if(cfg.tagZone){
+    var tagOk = slot.tagVariant !== 'off';
+    rows.push('<div class="import-status-row"><span>掛標</span>'+statusCheckIcon(tagOk)+'</div>');
+  }
+
+  var logoOk = !!slot.logoRaw;
+  rows.push('<div class="import-status-row"><span>LOGO</span>'+statusCheckIcon(logoOk)+'</div>');
+
+  var bgLabel = slot._importBgColorSpecified ? '指定色' : (slot.bgColor ? '系統配色' : '未設定');
+  rows.push('<div class="import-status-row"><span>底色</span><span>'+escHtml(bgLabel)+'</span></div>');
+
+  var artType = slot._importArtType;
+  var artLabel;
+  if(artType === '商品'){
+    artLabel = '商品('+(slot._importArtContent||'')+')';
+  } else if(artType === '素材'){
+    artLabel = '素材('+(slot._importMaterialType||'')+')';
+  } else if(artType){
+    artLabel = artType;
+  } else {
+    artLabel = '（無工單資料）';
+  }
+  rows.push('<div class="import-status-row"><span>曝品區</span><span>'+escHtml(artLabel)+'</span></div>');
+
+  return '<div class="import-status-sm">'+rows.join('')+'</div>';
+}
+
 function buildModalObjectsHTML(key, cfg, slot){
   var tabs = [
     { k:'product', label:'商品圖' },
@@ -446,21 +540,25 @@ function buildModalObjectsHTML(key, cfg, slot){
 
   html +=
     '<div class="obj-panel" data-panel="product">'+
-      // 去背/上傳更換/移除：由上往下排，沒有商品圖時整組隱藏(見updateProductToolsUI)
+      // 「上傳更換」不管有沒有商品圖都要看得到——移除後使用者才有辦法直接
+      // 上傳新圖，不用被迫先去資料庫選一張。去背/移除這兩個要「已經有圖」
+      // 才有意義(沒圖可以去背/移除)，沒圖時整組隱藏(見updateProductToolsUI)。
+      '<div class="field"><button class="tbtn btn-block" id="f-prod-replace">上傳更換</button></div>'+
       '<div id="f-prod-tools">'+
         '<div class="field"><button class="tbtn btn-block" id="f-prod-cutout">去背</button></div>'+
-        '<div class="field"><button class="tbtn btn-block" id="f-prod-replace">上傳更換</button></div>'+
         '<div class="field"><button class="tbtn btn-block" id="f-prod-remove">移除</button></div>'+
       '</div>'+
       '<div class="field"><button class="tbtn btn-block primary" id="f-prod-browse">瀏覽資料庫（圖示選擇）</button></div>'+
       '<div class="field"><label>或用下拉選單</label><select id="f-prod-lib"><option value="">－－</option></select></div>'+
       '<div id="material-text-fields">'+buildMaterialTextFieldsHTML(slot)+'</div>'+
-      '<div class="hint-sm">直接在畫布上點一下商品圖就能拖曳移動、拖四角控制點縮放、拖上方把手旋轉，滾輪也可以縮放。</div>'+
     '</div>';
 
   html +=
     '<div class="obj-panel" data-panel="logo">'+
-      '<div class="field row2"><button class="tbtn btn-block" id="f-logo-replace">上傳更換</button><button class="tbtn btn-block" id="f-logo-remove">移除</button></div>'+
+      // 「上傳更換」不管有沒有LOGO都要看得到，理由同商品圖那邊；「移除」要
+      // 已經有LOGO才有意義，沒有時隱藏(見updateLogoToolsUI)。
+      '<div class="field"><button class="tbtn btn-block" id="f-logo-replace">上傳更換</button></div>'+
+      '<div id="f-logo-tools"><div class="field"><button class="tbtn btn-block" id="f-logo-remove">移除</button></div></div>'+
       '<div class="field"><button class="tbtn btn-block primary" id="f-logo-browse">瀏覽資料庫（圖示選擇）</button></div>'+
       '<div class="field"><label>或用下拉選單</label><select id="f-logo-lib"><option value="">－－</option></select></div>'+
       '<div class="field"><label>形狀</label>'+
@@ -499,6 +597,8 @@ function buildModalObjectsHTML(key, cfg, slot){
         '</div>'+
       '</div>';
   }
+
+  html += computeImportStatusHTML(slot, cfg);
 
   return html;
 }
@@ -612,9 +712,11 @@ function bindMaterialTextFieldInputs(container, slot){
   });
 }
 
-/* 商品圖的「去背 / 上傳更換 / 移除」三顆按鈕：沒有商品圖時整組隱藏
-   (沒東西可去背、可換、可移除)；有商品圖但是是「券樣素材」(有疊字)時去背
-   反灰——券樣疊字位置是照整張圖的比例算的，裁切會讓字跑掉，而且這種是設計好的
+/* 商品圖的「去背 / 移除」兩顆按鈕：沒有商品圖時整組隱藏(沒東西可去背、
+   可移除)；「上傳更換」不在這組裡面，不管有沒有圖都固定看得到——移除後
+   使用者要能直接上傳新圖，不用被迫先去資料庫選一張才找得到上傳入口
+   (跟你確認過的行為)。有商品圖但是是「券樣素材」(有疊字)時去背反灰——
+   券樣疊字位置是照整張圖的比例算的，裁切會讓字跑掉，而且這種是設計好的
    固定素材，本來就不需要去背。這支要在每次slot.productSrc變動後呼叫，
    refreshModalStage()尾端會統一呼叫，所以不用每個入口各自處理。 */
 function updateProductToolsUI(slot){
@@ -627,6 +729,15 @@ function updateProductToolsUI(slot){
     cut.disabled = locked;
     cut.title = locked ? '券樣素材有疊字，不能去背/裁切（要用自己的圖請先「上傳更換」）' : '橡皮擦、裁切、自動去背、點選顏色去背';
   }
+}
+
+/* LOGO的「移除」按鈕：沒有LOGO時隱藏(沒東西可移除)；「上傳更換」同商品圖
+   的邏輯，不管有沒有LOGO都固定看得到。這支要在每次slot.logoRaw變動後
+   呼叫，refreshModalStage()尾端會統一呼叫。 */
+function updateLogoToolsUI(slot){
+  var box = document.getElementById('f-logo-tools');
+  if(!box || !slot) return;
+  box.style.display = slot.logoRaw ? '' : 'none';
 }
 
 /* 開啟去背編輯器（js/erase-editor.js，獨立模組）。完成套用後只換掉商品圖本身，
@@ -652,6 +763,7 @@ function openProductCutout(slot){
 function bindModalObjectFields(objects, slot, cfg){
   document.getElementById('f-prod-cutout').onclick = function(){ openProductCutout(slot); };
   updateProductToolsUI(slot);
+  updateLogoToolsUI(slot);
   document.getElementById('f-prod-replace').onclick = function(){
     Assets.pickImage(function(d){ setUploadedProductSrc(slot, d); refreshModalStage(); refreshMaterialTextFieldsUI(slot); syncProductLibrarySelect(slot); });
   };
@@ -719,7 +831,7 @@ function bindModalObjectFields(objects, slot, cfg){
   document.getElementById('f-logo-browse').onclick = function(){
     openLibraryDrawer('LOGO', AssetLibrary.sortByBrand(AssetLibrary.systemElements('logo'), slot.brand), function(path){
       slot.logoRaw = path; syncLogoPresets(slot, path); Modules.logo.applyProcessing(slot, refreshModalStage);
-    });
+    }, logoDefaultCategoryFor(_modalCtx.key));
   };
 
   if(cfg.tagZone){
@@ -817,9 +929,17 @@ function bindPresetChips(slot){
 
 /* 換LOGO（從資料庫選）之後，依那個LOGO在資料庫裡的登記更新這一格的專屬色票，
    並重畫色票列。找不到（或沒有登記色票）就清成沒有專屬色票。 */
-function syncLogoPresets(slot, logoPath){
+/* 純算色票資料，不碰DOM——sync用的版本(syncLogoPresets)是給「目前正在放大
+   編輯視窗裡的這一格」用，會順便重畫色票列/裁切按鈕；套用到「其他還沒打開
+   視窗的格子」(見applyLogoFixToSiblings)不能碰那些DOM元素(是別的格子，
+   不是目前開著的這個)，所以拆出這支共用的純算版本給兩邊呼叫。 */
+function computeLogoPresetFields(logoPath){
   var hit = AssetLibrary.systemElements('logo').filter(function(it){ return it.path === logoPath; })[0];
-  var f = hit ? AssetMatcher.logoPresetFields(hit) : { presetColors: [] };
+  return hit ? AssetMatcher.logoPresetFields(hit) : { presetColors: [] };
+}
+
+function syncLogoPresets(slot, logoPath){
+  var f = computeLogoPresetFields(logoPath);
   slot.presetColors = f.presetColors.slice();
   slot.presetBgColor = f.presetColors.length ? f.presetColors[0].bg : null;
   slot.presetTextColor = f.presetColors.length ? f.presetColors[0].text : null;
@@ -928,14 +1048,201 @@ function bindModalSettingsFields(settings, slot, cfg){
   document.getElementById('f-confirm-close').onclick = confirmModal;
 }
 
+/* 找出「跟剛修好的這一格，需要用同一個LOGO」的其他格子（排除自己），給
+   代補中的LOGO換好之後，問要不要幫其他一樣有問題的格子一起換上」用。
+   2026-09修bug：原本只比對logoRaw是不是同一個路徑，只抓得到「有比對到
+   資料庫路徑、但檔案還沒放進去」這種代補——你反映的情況是另一種更常見的
+   代補：Excel裡好幾格寫的是同一個LOGO代碼，但資料庫整個都還沒登記，
+   根本沒比對到任何路徑(logoRaw從頭到尾是空的)，這種原本的比對方式完全
+   抓不到，因為oldLogoRaw是空值，跟其他同樣是空值的格子沒有任何可以比較
+   的路徑。改成兩種判斷方式都做，命中任一種就算：
+     1. 路徑相同(samePath)：兩邊logoRaw都是同一個路徑(不管是不是能載入)。
+     2. 匯入文字相同(sameImportText)：比對slot._importLogoRaw(Excel那一欄
+        原始寫的文字，不管有沒有比對成功都會留著，見editor-import.js)標準化
+        後是否相同——這樣不管兩邊比對結果是「都沒比對到」還是「比對到同一個
+        路徑但檔案不見」，只要Excel寫的是同一組代碼，都算是同一個LOGO。
+   兩種方式都只挑「現在看起來還是有問題」的格子(stillBroken)：已經被
+   使用者自己另外修好的格子不用再問一次。 */
+function findSlotsNeedingSameLogoFix(excludeSlot, oldLogoRaw, oldImportLogoRaw){
+  var normOldImport = (oldImportLogoRaw && typeof AssetMatcher !== 'undefined') ? AssetMatcher.normKey(oldImportLogoRaw) : null;
+  var out = [];
+  STATE.banners.forEach(function(banner){
+    Core.SLOT_KEYS.forEach(function(key){
+      var s = banner[key];
+      if(s === excludeSlot) return;
+      var stillBroken = !(s.logoRaw || s.logoSrc) || !!s.__logoLoadFailed;
+      if(!stillBroken) return;
+      var samePath = !!(oldLogoRaw && s.logoRaw === oldLogoRaw);
+      var sameImportText = !!(normOldImport && s._importLogoRaw && AssetMatcher.normKey(s._importLogoRaw) === normOldImport);
+      if(samePath || sameImportText) out.push(s);
+    });
+  });
+  return out;
+}
+
+/* 找出「跟剛編輯完的這一格用同一顆LOGO」的其他格子（排除自己）——這次
+   是給「LOGO原本就匯入成功、使用者只是改了底色」這種情況用的，跟上面
+   findSlotsNeedingSameLogoFix不一樣：不看格子現在是不是還「有問題」
+   (stillBroken)，因為這些格子的LOGO本來就是好的，只是比對logoRaw是不是
+   同一個路徑（已經確實載入成功的真實路徑，不用再看_importLogoRaw這種
+   還沒比對成功時的備援比對）。 */
+function findSlotsWithSameWorkingLogo(excludeSlot, logoRaw){
+  if(!logoRaw) return [];
+  var out = [];
+  STATE.banners.forEach(function(banner){
+    Core.SLOT_KEYS.forEach(function(key){
+      var s = banner[key];
+      if(s === excludeSlot) return;
+      if(s.logoRaw === logoRaw) out.push(s);
+    });
+  });
+  return out;
+}
+
+/* 把「剛剛修好的那組LOGO+底色」套用到其他一樣代補中的格子——跟使用者手動
+   從資料庫選圖時走的是同一套欄位(logoRaw/logoBgColor/專屬色票)，差別只是
+   這裡是一次套用到好幾格，且清掉的是「別格」的內容框快取(__logoContentW等)，
+   讓那一格下次畫的時候重新偵測，不會沿用舊LOGO的偵測結果。 */
+/* colors是{bgColor, titleColor, logoBgColor}——三個都是「底色」的一部分，
+   但意義不一樣：bgColor/titleColor是整張卡片的背景色+標題文字色(常見於
+   點了LOGO的「套用檔期標準色」色票之後跟著變的那組)，logoBgColor是LOGO
+   本身「裁切+色底」模式下膠囊的底色(只有logoMode='trim'才會用到)。 */
+function applyLogoFixToSiblings(siblings, newLogoRaw, colors){
+  var f = computeLogoPresetFields(newLogoRaw);
+  siblings.forEach(function(s){
+    s.logoRaw = newLogoRaw;
+    // 2026-09修bug：漏了同步設定logoSrc，導致「一起換上」按下去資料看起來
+    // 有改（logoRaw變了），畫面卻完全沒反應——logo-module.js的buildDom是看
+    // slot.logoSrc是不是有值來決定要不要畫圖(見「if(!slot.logoSrc){顯示
+    // 空的LOGO佔位}」)，不是看logoRaw。這幾格原本是「完全沒比對到」的代補
+    // (logoSrc本來就是null)，只改logoRaw、沒有跟著把logoSrc也設成一樣的值，
+    // 畫面就會一直卡在空的LOGO佔位，即使logoRaw資料已經是對的。跟手動從
+    // 資料庫選LOGO時一樣，換了logoRaw就要呼叫Modules.logo.applyProcessing
+    // 讓logoSrc跟著同步（現在的applyProcessing邏輯很單純，就是logoSrc=
+    // logoRaw，但透過這支呼叫，以後那支邏輯改了這裡也會自動跟著對）。
+    Modules.logo.applyProcessing(s, function(){});
+    // 2026-09修bug：原本只同步logoBgColor(LOGO裁切模式自己的膠囊底色，
+    // 大部分情況根本用不到)，漏了真正常用的「卡片底色」bgColor/titleColor
+    // ——你點LOGO旁邊「套用檔期標準色」色票改的是這兩個欄位，不是
+    // logoBgColor，難怪你反映「LOGO換成功了，顏色沒套用上」。這次三個
+    // 一起同步。
+    s.bgColor = colors.bgColor;
+    s.titleColor = colors.titleColor;
+    s.logoBgColor = colors.logoBgColor;
+    s.__logoContentW = null; s.__logoContentH = null; s.__trimInitFor = null; s.__logoLoadFailed = null;
+    s.presetColors = f.presetColors.slice();
+    s.presetBgColor = f.presetColors.length ? f.presetColors[0].bg : null;
+    s.presetTextColor = f.presetColors.length ? f.presetColors[0].text : null;
+    if(f.forceTrimMode) s.logoMode = 'trim';
+  });
+}
+
+/* 代補中的LOGO換好、按下「完成」關掉放大編輯視窗之後跳出的確認popup——
+   跟你確認過的時機：在外面的畫布上出現，不是在放大編輯視窗裡面。 */
+function confirmApplyLogoFixToSiblings(siblings, newLogoRaw, colors){
+  var overlay = createOverlay(
+    '<div class="popup-panel" style="width:420px;">'+
+      '<div class="popup-head"><span>其他相同的代補LOGO也一起換上？</span><button class="popup-x" onclick="closePopup()">×</button></div>'+
+      '<div class="popup-body">'+
+        '<div class="banword-warning" style="display:block;">這張工單裡還有 '+siblings.length+' 格是一樣的LOGO、目前也是代補中（還沒放圖）。要不要把剛剛選好的LOGO跟底色，一起套用到這些格子？</div>'+
+      '</div>'+
+      '<div class="popup-foot">'+
+        '<button class="tbtn" id="logo-fix-skip-btn">不用，只改這一格</button>'+
+        '<span style="flex:1"></span>'+
+        '<button class="tbtn primary" id="logo-fix-apply-btn">一起換上</button>'+
+      '</div>'+
+    '</div>'
+  );
+  overlay.querySelector('#logo-fix-skip-btn').onclick = closePopup;
+  overlay.querySelector('#logo-fix-apply-btn').onclick = function(){
+    applyLogoFixToSiblings(siblings, newLogoRaw, colors);
+    closePopup();
+    renderAll();
+  };
+}
+
+/* 只同步底色，不動LOGO本身——用在「LOGO原本就匯入成功，使用者只是改了
+   底色」這種情況，跟applyLogoFixToSiblings不一樣的地方：這些格子的LOGO
+   本來就是對的，不用重新跑Modules.logo.applyProcessing，也不用清內容框
+   快取或改套色票清單(色票清單跟LOGO綁在一起，LOGO沒換就不用動)。 */
+function applyColorFixToSiblings(siblings, colors){
+  siblings.forEach(function(s){
+    s.bgColor = colors.bgColor;
+    s.titleColor = colors.titleColor;
+    s.logoBgColor = colors.logoBgColor;
+  });
+}
+
+/* LOGO本來就是好的、使用者只改了底色，關閉放大編輯視窗後跳出的確認
+   popup——用詞刻意跟上面「代補LOGO」那組分開，因為這裡LOGO沒有換、
+   只是底色要不要一起同步。 */
+function confirmApplyColorFixToSiblings(siblings, colors){
+  var overlay = createOverlay(
+    '<div class="popup-panel" style="width:420px;">'+
+      '<div class="popup-head"><span>其他用同一顆LOGO的格子也一起換底色？</span><button class="popup-x" onclick="closePopup()">×</button></div>'+
+      '<div class="popup-body">'+
+        '<div class="banword-warning" style="display:block;">這張工單裡還有 '+siblings.length+' 格用的是同一顆LOGO。要不要把剛剛改好的底色，一起套用到這些格子？</div>'+
+      '</div>'+
+      '<div class="popup-foot">'+
+        '<button class="tbtn" id="color-fix-skip-btn">不用，只改這一格</button>'+
+        '<span style="flex:1"></span>'+
+        '<button class="tbtn primary" id="color-fix-apply-btn">一起換上</button>'+
+      '</div>'+
+    '</div>'
+  );
+  overlay.querySelector('#color-fix-skip-btn').onclick = closePopup;
+  overlay.querySelector('#color-fix-apply-btn').onclick = function(){
+    applyColorFixToSiblings(siblings, colors);
+    closePopup();
+    renderAll();
+  };
+}
+
 /* 「完成」按鈕：把草稿寫回真正的banner[key]，畫面(主畫面縮圖)才會真的
-   更新；closeModal()本身不寫回任何東西，這裡才是唯一真正「儲存」的地方。 */
+   更新；closeModal()本身不寫回任何東西，這裡才是唯一真正「儲存」的地方。
+   2026-09：如果這一格關進來之前的LOGO本來就有問題——不管是「有比對到路徑
+   但檔案404」(origLogoMissing)還是「Excel裡根本沒比對到任何路徑」
+   (origLogoRaw從頭到尾是空的)——使用者在裡面把LOGO換成別的之後，關閉後
+   順便檢查同一份文件裡還有沒有其他格子是同一個問題LOGO，有的話跳確認
+   popup問要不要一起換掉。這個檢查/popup一定要在closeModal()之後才做：
+   closeModal()會把_modalCtx清空，要先把需要用到的值存成區域變數。 */
 function confirmModal(){
-  if(_modalCtx){
-    Object.assign(_modalCtx.realSlot, _modalCtx.slot);
-    _modalCtx.realSlot.materialTexts = (_modalCtx.slot.materialTexts || []).slice();
-  }
+  if(!_modalCtx){ closeModal(); return; }
+
+  var ctx = _modalCtx;
+  var oldLogoRaw = ctx.origLogoRaw;
+  var oldImportLogoRaw = ctx.origImportLogoRaw;
+  var wasMissingPath = ctx.origLogoMissing;   // 有比對到路徑，但檔案404
+  var wasUnmatched = !oldLogoRaw;             // 一開始就沒比對到任何路徑
+  var newLogoRaw = ctx.slot.logoRaw;
+  var newColors = { bgColor: ctx.slot.bgColor, titleColor: ctx.slot.titleColor, logoBgColor: ctx.slot.logoBgColor };
+  var realSlot = ctx.realSlot;
+
+  Object.assign(ctx.realSlot, ctx.slot);
+  ctx.realSlot.materialTexts = (ctx.slot.materialTexts || []).slice();
+
   closeModal();
+
+  if((wasMissingPath || wasUnmatched) && newLogoRaw && newLogoRaw !== oldLogoRaw){
+    var siblings = findSlotsNeedingSameLogoFix(realSlot, oldLogoRaw, oldImportLogoRaw);
+    if(siblings.length) confirmApplyLogoFixToSiblings(siblings, newLogoRaw, newColors);
+    return;
+  }
+
+  // 2026-09新增：這一格的LOGO本來就是好的（不是代補中），使用者只是在
+  // 放大編輯視窗裡改了底色（例如點了另一組「套用檔期標準色」色票）——
+  // 這種情況也該問「工單裡其他用同一顆LOGO的格子要不要一起換底色」，
+  // 不然使用者還是得逐格手動改。判斷條件：LOGO本身沒換(newLogoRaw===
+  // oldLogoRaw，且原本就是有效路徑)、底色其中一項真的有變動過。
+  if(!wasMissingPath && !wasUnmatched && newLogoRaw && newLogoRaw === oldLogoRaw){
+    var colorChanged = newColors.bgColor !== ctx.origBgColor
+      || newColors.titleColor !== ctx.origTitleColor
+      || newColors.logoBgColor !== ctx.origLogoBgColor;
+    if(colorChanged){
+      var colorSiblings = findSlotsWithSameWorkingLogo(realSlot, newLogoRaw);
+      if(colorSiblings.length) confirmApplyColorFixToSiblings(colorSiblings, newColors);
+    }
+  }
 }
 
 /* text-module.js的contenteditable oninput會呼叫這個全域hook——放大編輯
@@ -984,7 +1291,7 @@ function refreshLibrarySelects(){
    位置/大小完全不會變動。 */
 var _libraryDrawerOpenFor = null; // 記錄目前開著的是哪一個(曝品/LOGO)，同一個再點一次要能收合
 
-function openLibraryDrawer(label, items, onPick){
+function openLibraryDrawer(label, items, onPick, defaultCategory){
   var settings = document.getElementById('modal-settings');
   var libraryFace = document.getElementById('modal-library-face');
   if(!settings || !libraryFace) return;
@@ -1042,6 +1349,10 @@ function openLibraryDrawer(label, items, onPick){
     });
     var catKeys = Object.keys(byCategory);
     var groupEls = []; // 記錄每個分類的{grid, chevron, titleEl, cards}，accordion收合／搜尋篩選時要用
+    // 指定分類找不到（例如defaultCategory沒傳、或這批items根本沒有那個分類）
+    // 就退回原本「第一個分類」的預設行為。
+    var defaultIdx = defaultCategory ? catKeys.indexOf(defaultCategory) : -1;
+    if(defaultIdx < 0) defaultIdx = 0;
 
     catKeys.forEach(function(catLabel, catIdx){
       var title = document.createElement('div');
@@ -1097,7 +1408,7 @@ function openLibraryDrawer(label, items, onPick){
       // 打開某一個會自動收合其他的（跟你舉的例子一樣：開造節就收全站大促）。
       // 搜尋中(searchInput有輸入內容)時例外：每個分類獨立開關，不影響其他
       // 已經因為搜尋結果而展開的分類。
-      var expanded = (catIdx === 0);
+      var expanded = (catIdx === defaultIdx);
       grid.style.display = expanded ? '' : 'none';
       chevron.style.transform = expanded ? 'rotate(0deg)' : 'rotate(-90deg)';
 
@@ -1120,11 +1431,11 @@ function openLibraryDrawer(label, items, onPick){
         var q = searchInput.value.trim().toLowerCase();
         groupEls.forEach(function(g, i){
           if(!q){
-            // 清空搜尋 → 恢復預設手風琴狀態：全部卡片顯示、第一個分類展開
+            // 清空搜尋 → 恢復預設手風琴狀態：全部卡片顯示、預設分類展開
             g.cards.forEach(function(c){ c.el.style.display = ''; });
             g.titleEl.style.display = '';
-            g.grid.style.display = (i===0) ? '' : 'none';
-            g.chevron.style.transform = (i===0) ? 'rotate(0deg)' : 'rotate(-90deg)';
+            g.grid.style.display = (i===defaultIdx) ? '' : 'none';
+            g.chevron.style.transform = (i===defaultIdx) ? 'rotate(0deg)' : 'rotate(-90deg)';
             return;
           }
           var anyMatch = false;
@@ -1214,12 +1525,20 @@ function refreshModalStage(){
   if(!_modalCtx) return;
   pushUndoCheckpoint();
   updateProductToolsUI(_modalCtx.slot);
+  updateLogoToolsUI(_modalCtx.slot);
   var stage = document.getElementById('modal-stage-inner');
   if(!stage) return;
   stage.innerHTML = '';
   var el = Core.buildBlockStage(_modalCtx.slot, _modalCtx.key, _modalCtx.scale, {
     onChange: refreshModalStage,
     onRequestLogoPick: function(){ Assets.pickImage(function(d){ _modalCtx.slot.logoRaw = d; clearLogoPresets(_modalCtx.slot); Modules.logo.applyProcessing(_modalCtx.slot, refreshModalStage); }); },
+    // 代補中的LOGO（比對到資料庫路徑、但資料夾裡還沒放圖）被點到時走這支，
+    // 直接開資料庫瀏覽，不是跳系統選檔案——見logo-module.js的onRequestLibraryPick。
+    onRequestLogoLibraryPick: function(){
+      openLibraryDrawer('LOGO', AssetLibrary.sortByBrand(AssetLibrary.systemElements('logo'), _modalCtx.slot.brand), function(path){
+        _modalCtx.slot.logoRaw = path; syncLogoPresets(_modalCtx.slot, path); Modules.logo.applyProcessing(_modalCtx.slot, refreshModalStage);
+      }, logoDefaultCategoryFor(_modalCtx.key));
+    },
     onRequestProductPick: function(){ Assets.pickImage(function(d){ setUploadedProductSrc(_modalCtx.slot, d); refreshModalStage(); refreshMaterialTextFieldsUI(_modalCtx.slot); syncProductLibrarySelect(_modalCtx.slot); }); },
     // 點畫布上的logo/商品/掛標，左側分頁自動跟著切過去，不用自己再點一次
     // 左邊的分頁按鈕(跟你確認過的導覽捷徑)。

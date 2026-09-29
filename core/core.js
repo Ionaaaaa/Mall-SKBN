@@ -52,7 +52,12 @@ var Core = (function(){
 
     Modules.logo.buildDom(el, slot, cfg, originX, originY, scale, onChange, function(){
       (hooks.onRequestLogoPick || function(){})();
-    }, onSelectLogo);
+    }, onSelectLogo, function(){
+      // 代補中的LOGO被點到：優先交給呼叫端專門的「開資料庫」處理(放大編輯視窗
+      // 才有這個hook)；主畫面沒傳這個hook時，退回原本的onRequestLogoPick
+      // (跳系統選檔案)，維持主畫面原本的既有行為，不會因為沒接這個新hook而沒反應。
+      (hooks.onRequestLogoLibraryPick || hooks.onRequestLogoPick || function(){})();
+    });
 
     if(cfg.tagZone){
       Modules.tag.buildDom(el, slot, cfg, originX, originY, scale, onChange, onSelectTag);
@@ -135,6 +140,7 @@ var Core = (function(){
       onChange: hooks.onChange,
       expanded: true,
       onRequestLogoPick: hooks.onRequestLogoPick,
+      onRequestLogoLibraryPick: hooks.onRequestLogoLibraryPick,
       onRequestProductPick: hooks.onRequestProductPick,
       onSelectLogo: hooks.onSelectLogo,
       onSelectProduct: hooks.onSelectProduct,

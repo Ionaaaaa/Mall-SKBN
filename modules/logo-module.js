@@ -188,7 +188,7 @@ window.Modules.logo = {
     ctx.drawImage(src, dx, dy, dw, dh);
   },
 
-  buildDom: function(el, slot, cfg, originX, originY, scale, onChange, onRequestPick, onSelect){
+  buildDom: function(el, slot, cfg, originX, originY, scale, onChange, onRequestPick, onSelect, onRequestLibraryPick){
     var zone = Modules.logo.effectiveZone(cfg, slot);
     var box = document.createElement('div');
     box.className = 'zone-box logo-zone';
@@ -202,11 +202,11 @@ window.Modules.logo = {
     }
 
     Modules.logo._detectLogoContent(slot, zone.w, zone.h, function(){
-      Modules.logo._buildInteractive(box, slot, zone, scale, onRequestPick, onChange, onSelect);
+      Modules.logo._buildInteractive(box, slot, zone, scale, onRequestPick, onChange, onSelect, onRequestLibraryPick);
     });
   },
 
-  _buildInteractive: function(box, slot, zone, scale, onRequestPick, onChange, onSelect){
+  _buildInteractive: function(box, slot, zone, scale, onRequestPick, onChange, onSelect, onRequestLibraryPick){
     var boxW = zone.w*scale, boxH = zone.h*scale;
     var canvas = document.createElement('canvas');
     var dpr = window.devicePixelRatio || 1;
@@ -279,10 +279,23 @@ window.Modules.logo = {
       im.onload = function(){
         img = im;
         slot.__lmCache = { src: src, img: im };
+        slot.__logoLoadFailed = false;
         redraw();
       };
       im.onerror = function(){
+        // 代補：這一格已經有比對到的路徑，但資料夾裡還沒有這張圖（或路徑打錯）。
+        // 記一個旗標(__logoLoadFailed)給confirmModal用——使用者從資料庫裡挑到
+        // 正確的圖確認關閉放大編輯視窗時，才知道「這一格原本是代補狀態」，
+        // 進而詢問要不要把同一張工單裡其他一樣代補中的LOGO也一起換上。
+        slot.__logoLoadFailed = true;
         box.innerHTML = '<span class="ph">LOGO圖片找不到（資料庫路徑還沒放檔案，需手動上傳/選擇）</span>';
+        // 點一下代補中的LOGO，直接開資料庫瀏覽（不是跳系統選檔案）——反正
+        // 這一格本來就是「比對到資料庫裡的某個項目，只是圖還沒放」，使用者
+        // 通常是想從資料庫裡换成別筆已經有圖的項目，不是要自己手動上傳。
+        if(onRequestLibraryPick){
+          box.style.cursor = 'pointer';
+          box.onclick = function(){ if(onSelect) onSelect(); onRequestLibraryPick(); };
+        }
       };
       im.src = src;
     }
