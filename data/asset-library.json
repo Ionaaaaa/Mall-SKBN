@@ -82,7 +82,9 @@
           "matchKeys": [
             "1.11",
             "1.11購物節"
-          ]
+          ],
+          "presetBgColor": "#ee4e2e",
+          "presetTextColor": "#fffd3e"
         },
         {
           "id": "22sale_logo",
@@ -93,7 +95,9 @@
           "matchKeys": [
             "2.2",
             "2.2購物節"
-          ]
+          ],
+          "presetBgColor": "#ee4e2e",
+          "presetTextColor": "#fffd3e"
         },
         {
           "id": "33sale_logo",
@@ -104,7 +108,9 @@
           "matchKeys": [
             "3.3",
             "3.3購物節"
-          ]
+          ],
+          "presetBgColor": "#ee4e2e",
+          "presetTextColor": "#fffd3e"
         },
         {
           "id": "44sale_logo",
@@ -115,7 +121,9 @@
           "matchKeys": [
             "4.4",
             "4.4購物節"
-          ]
+          ],
+          "presetBgColor": "#ee4e2e",
+          "presetTextColor": "#fffd3e"
         },
         {
           "id": "55sale_logo",
@@ -126,7 +134,9 @@
           "matchKeys": [
             "5.5",
             "5.5購物節"
-          ]
+          ],
+          "presetBgColor": "#ee4e2e",
+          "presetTextColor": "#fffd3e"
         },
         {
           "id": "66sale_logo",
@@ -137,7 +147,9 @@
           "matchKeys": [
             "6.6",
             "6.6購物節"
-          ]
+          ],
+          "presetBgColor": "#ee4e2e",
+          "presetTextColor": "#fffd3e"
         },
         {
           "id": "618sale_logo",
@@ -161,7 +173,9 @@
           "matchKeys": [
             "7.7",
             "7.7購物節"
-          ]
+          ],
+          "presetBgColor": "#ee4e2e",
+          "presetTextColor": "#fffd3e"
         },
         {
           "id": "88sale_logo",
@@ -172,7 +186,9 @@
           "matchKeys": [
             "8.8",
             "8.8購物節"
-          ]
+          ],
+          "presetBgColor": "#ee4e2e",
+          "presetTextColor": "#fffd3e"
         },
         {
           "id": "99brandsale_logo",
@@ -217,6 +233,8 @@
             "11.11",
             "11.11最強購物節"
           ],
+          "presetBgColor": "#ee4e2e",
+          "presetTextColor": "#fffd3e",
           "_note": "這張LOGO的數字帶彩色立體邊(不是純白)。目前大促類(siteWideSale)匯入時會固定開「強制白色」，彩色邊會一起變成白色剪影；想保留彩色的話，在放大編輯面板把強制白色關掉即可。"
         },
         {
@@ -229,6 +247,8 @@
             "12.12",
             "12.12狂歡生日慶"
           ],
+          "presetBgColor": "#ee4e2e",
+          "presetTextColor": "#fffd3e",
           "_note": "這張LOGO的數字帶彩色立體邊(不是純白)。目前大促類(siteWideSale)匯入時會固定開「強制白色」，彩色邊會一起變成白色剪影；想保留彩色的話，在放大編輯面板把強制白色關掉即可。"
         },
         {
