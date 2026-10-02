@@ -1064,7 +1064,10 @@ function bindModalSettingsFields(settings, slot, cfg){
    兩種方式都只挑「現在看起來還是有問題」的格子(stillBroken)：已經被
    使用者自己另外修好的格子不用再問一次。 */
 function findSlotsNeedingSameLogoFix(excludeSlot, oldLogoRaw, oldImportLogoRaw){
-  var normOldImport = (oldImportLogoRaw && typeof AssetMatcher !== 'undefined') ? AssetMatcher.normKey(oldImportLogoRaw) : null;
+  // 2026-10：工單LOGO欄寫「無」或「-」(不需要LOGO)的格子不算「同一個LOGO代碼」
+  // ——不然在其中一格手動放了LOGO，會跳出來問要不要幫其他所有寫「無/-」的
+  // 格子一起換上。
+  var normOldImport = (oldImportLogoRaw && typeof AssetMatcher !== 'undefined' && !AssetMatcher.isNoLogoMark(oldImportLogoRaw)) ? AssetMatcher.normKey(oldImportLogoRaw) : null;
   var out = [];
   STATE.banners.forEach(function(banner){
     Core.SLOT_KEYS.forEach(function(key){
@@ -1563,7 +1566,10 @@ function closeModal(){
 /* 素材比對警示是「活的」：匯入時記下哪一格(banner+key)、缺的是LOGO還是商品圖，
    每次重畫面板都重新檢查那一格現在有沒有圖——使用者手動上傳/選了圖之後，
    這條警示就自動消失。那一組已經被刪掉(不在STATE.banners裡)的也一併不顯示。
-   純文字的警示(舊格式/沒有對應格子的)維持一直顯示。 */
+   純文字的警示(舊格式/沒有對應格子的)維持一直顯示。
+   2026-10：「沒有圖可以抓色、背景色維持版型預設」這條(kind:'bgcolor')也改成
+   活的——那一格之後手動指定了底色(slot.bgColor有值)，或是補上了匯入當下
+   沒有的LOGO/商品圖，就自動消失。 */
 function activeAssetWarnings(){
   return (STATE.warnings || []).filter(function(w){
     if(typeof w === 'string') return true;
@@ -1572,6 +1578,12 @@ function activeAssetWarnings(){
     if(!s) return false;
     if(w.kind === 'logo') return !(s.logoRaw || s.logoSrc);
     if(w.kind === 'product') return !s.productSrc;
+    if(w.kind === 'bgcolor'){
+      if(s.bgColor) return false;
+      if(!w.hadLogo && (s.logoRaw || s.logoSrc)) return false;
+      if(!w.hadProduct && s.productSrc) return false;
+      return true;
+    }
     return true;
   });
 }

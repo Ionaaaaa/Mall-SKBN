@@ -32,7 +32,9 @@
           "path": "system-elements/festival/shopee-mom-baby-expo_logo.png",
           "matchKeys": [
             "蝦皮婦幼展",
-            "婦幼展"
+            "婦幼展",
+            "婦幼節",
+            "婦幼"
           ]
         },
         {
@@ -67,6 +69,232 @@
             "內衣節",
             "蝦皮內衣節"
           ]
+        },
+        {
+          "id": "food-new-year-festival_logo",
+          "brand": "美食年貨節",
+          "name": "美食年貨節",
+          "type": "logo",
+          "path": "system-elements/festival/food-new-year-festival_logo.png",
+          "matchKeys": [
+            "美食年貨節",
+            "美食年貨"
+          ]
+        },
+        {
+          "id": "home-new-year-festival_logo",
+          "brand": "居家年貨節",
+          "name": "居家年貨節",
+          "type": "logo",
+          "path": "system-elements/festival/home-new-year-festival_logo.png",
+          "matchKeys": [
+            "居家年貨節",
+            "居家年貨"
+          ]
+        },
+        {
+          "id": "spring-gifting_logo",
+          "brand": "開春送禮",
+          "name": "開春送禮",
+          "type": "logo",
+          "path": "system-elements/festival/spring-gifting_logo.png",
+          "matchKeys": [
+            "開春送禮",
+            "開春"
+          ]
+        },
+        {
+          "id": "new-year-reading-festival_logo",
+          "brand": "新春閱讀節",
+          "name": "新春閱讀節",
+          "type": "logo",
+          "path": "system-elements/festival/new-year-reading-festival_logo.png",
+          "matchKeys": [
+            "新春閱讀節",
+            "新春閱讀",
+            "閱讀節"
+          ]
+        },
+        {
+          "id": "queens-day-festival_logo",
+          "brand": "寵愛女王節",
+          "name": "寵愛女王節",
+          "type": "logo",
+          "path": "system-elements/festival/queens-day-festival_logo.png",
+          "matchKeys": [
+            "寵愛女王節",
+            "寵愛女王",
+            "女王節"
+          ]
+        },
+        {
+          "id": "shoe-season_logo",
+          "brand": "開鞋季",
+          "name": "開鞋季",
+          "type": "logo",
+          "path": "system-elements/festival/shoe-season_logo.png",
+          "matchKeys": [
+            "開鞋季",
+            "開鞋"
+          ]
+        },
+        {
+          "id": "summer-appliance-festival_logo",
+          "brand": "涼夏家電祭",
+          "name": "涼夏家電祭",
+          "type": "logo",
+          "path": "system-elements/festival/summer-appliance-festival_logo.png",
+          "matchKeys": [
+            "涼夏家電祭",
+            "涼夏家電",
+            "涼夏"
+          ]
+        },
+        {
+          "id": "mega-appliance-festival_logo",
+          "brand": "狂購家電祭",
+          "name": "狂購家電祭",
+          "type": "logo",
+          "path": "system-elements/festival/mega-appliance-festival_logo.png",
+          "matchKeys": [
+            "狂購家電祭",
+            "狂購家電"
+          ]
+        },
+        {
+          "id": "year-end-clearance_logo",
+          "brand": "年終出清",
+          "name": "年終出清",
+          "type": "logo",
+          "path": "system-elements/festival/year-end-clearance_logo.png",
+          "matchKeys": [
+            "年終出清"
+          ]
+        },
+        {
+          "id": "shopee-health-festival_logo",
+          "brand": "蝦皮保健節",
+          "name": "蝦皮保健節",
+          "type": "logo",
+          "path": "system-elements/festival/shopee-health-festival_logo.png",
+          "matchKeys": [
+            "蝦皮保健節",
+            "保健節"
+          ]
+        },
+        {
+          "id": "shopee-pet-expo_logo",
+          "brand": "蝦皮寵物展",
+          "name": "蝦皮寵物展",
+          "type": "logo",
+          "path": "system-elements/festival/shopee-pet-expo_logo.png",
+          "matchKeys": [
+            "蝦皮寵物展",
+            "寵物展",
+            "寵物節"
+          ]
+        },
+        {
+          "id": "shopee-auto-festival_logo",
+          "brand": "蝦皮曬車節",
+          "name": "蝦皮曬車節",
+          "type": "logo",
+          "path": "system-elements/festival/shopee-auto-festival_logo.png",
+          "matchKeys": [
+            "蝦皮曬車節",
+            "曬車節",
+            "晒車節",
+            "曬車"
+          ]
+        },
+        {
+          "id": "shopee-mi-festival_logo",
+          "brand": "蝦MI節",
+          "name": "蝦MI節",
+          "type": "logo",
+          "path": "system-elements/festival/shopee-mi-festival_logo.png",
+          "matchKeys": [
+            "蝦MI節",
+            "蝦米節",
+            "蝦MI",
+            "蝦米"
+          ]
+        },
+        {
+          "id": "apple-fans-festival_logo",
+          "brand": "果粉節",
+          "name": "果粉節",
+          "type": "logo",
+          "path": "system-elements/festival/apple-fans-festival_logo.png",
+          "matchKeys": [
+            "果粉節",
+            "果粉"
+          ]
+        },
+        {
+          "id": "mobile-accessories-festival_logo",
+          "brand": "手機配件節",
+          "name": "手機配件節",
+          "type": "logo",
+          "path": "system-elements/festival/mobile-accessories-festival_logo.png",
+          "matchKeys": [
+            "手機配件節",
+            "手機配件",
+            "配件節"
+          ]
+        },
+        {
+          "id": "oral-care-festival_logo",
+          "brand": "從齒玩美",
+          "name": "從齒玩美",
+          "type": "logo",
+          "path": "system-elements/festival/oral-care-festival_logo.png",
+          "matchKeys": [
+            "從齒玩美",
+            "從齒完美",
+            "從齒"
+          ]
+        },
+        {
+          "id": "sports-fever_logo",
+          "brand": "全民瘋運動",
+          "name": "全民瘋運動",
+          "type": "logo",
+          "path": "system-elements/festival/sports-fever_logo.png",
+          "matchKeys": [
+            "全民瘋運動",
+            "瘋運動",
+            "全民運動"
+          ]
+        },
+        {
+          "id": "food-deals-weekly_logo",
+          "brand": "美食好康週報",
+          "name": "美食好康週報",
+          "type": "logo",
+          "path": "system-elements/festival/food-deals-weekly_logo.png",
+          "matchKeys": [
+            "美食好康週報",
+            "美食好康周報",
+            "好康週報",
+            "好康周報",
+            "美食週報",
+            "美食周報"
+          ]
+        },
+        {
+          "id": "shopee-fashion-week_logo",
+          "brand": "蝦皮時尚週",
+          "name": "蝦皮時尚週",
+          "type": "logo",
+          "path": "system-elements/festival/shopee-fashion-week_logo.png",
+          "matchKeys": [
+            "蝦皮時尚週",
+            "蝦皮時尚周",
+            "時尚週",
+            "時尚周"
+          ],
+          "_note": "這張LOGO是「白底黑字+黑底白字」兩塊拼起來的(白色那塊是實心的，不是透明)。造節類匯入時如果背景偏深，會自動開「強制白色」，整張會變成一塊白色剪影、字看不到；遇到深色背景請在放大編輯面板把強制白色關掉。"
         }
       ]
     },
@@ -162,7 +390,9 @@
             "618全民年中慶",
             "618大促\\01_LOGO",
             "618大促/01_LOGO"
-          ]
+          ],
+          "presetBgColor": "#ee4e2e",
+          "presetTextColor": "#fffd3e"
         },
         {
           "id": "77sale_logo",

@@ -345,7 +345,17 @@ function resolveSlot(slot, banner, bannerIdx, key, warnings){
           slot.bgColor = bg.hex;
           slot.titleColor = ColorUtils.pickTextColorForBackground(bg.hex);
         } else {
-          warnings.push(label+'：目前沒有LOGO/商品圖可以抓色，背景色維持版型預設，建議之後手動指定');
+          // 2026-10：改成跟LOGO/商品比對警示一樣的物件格式(kind:'bgcolor')，
+          // 原本是純文字、沒有記是哪一格，面板沒辦法回頭檢查，所以事後補了
+          // 圖或手動調了底色，這條還是一直掛著。hadLogo/hadProduct記下「匯入
+          // 當下這一格有沒有圖」，給editor-main.js的activeAssetWarnings判斷
+          // 「之後是不是補了新的圖」用。
+          warnings.push({
+            text: label+'：目前沒有LOGO/商品圖可以抓色，背景色維持版型預設，建議之後手動指定',
+            banner: banner, key: key, kind: 'bgcolor',
+            hadLogo: !!(slot.logoRaw || slot.logoSrc),
+            hadProduct: !!slot.productSrc
+          });
         }
         applyLogoWhiteAuto();
         resolve();

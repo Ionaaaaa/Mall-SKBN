@@ -37,6 +37,15 @@ var AssetMatcher = (function(){
     return String(s||'').replace(/^[（(][^）)]*[）)]\s*/, '').trim();
   }
 
+  /* 工單LOGO欄寫「無」或只寫一個橫線(-、－、—、–…，全形半形都算)，都代表
+     「這一格不需要放LOGO」。2026-10：原本只認「無」，寫「-」會被當成一般
+     文字去比對——LOGO欄比對不到就退回看檔期欄，結果檔期欄剛好是資料庫裡有
+     的名字(例如蝦皮直營)時，會自己帶一張LOGO進去。 */
+  function isNoLogoMark(raw){
+    var s = toHalfWidth(raw).replace(/\s+/g, '');
+    return s === '無' || /^[-\u2010-\u2015\u2212\u2500\u30FC\uFE58\uFE63]+$/.test(s);
+  }
+
   function isBuiltinRef(raw){
     return /[\\\/]/.test(String(raw||''));
   }
@@ -68,9 +77,11 @@ var AssetMatcher = (function(){
        (a) 短的搶走長的：工單寫「蝦皮直營3C家電」會先中「蝦皮直營」；日期類
            關鍵字更明顯，「11.11」裡面就包含「1.11」，誰排前面誰贏。
        (b) 沒有數字邊界：「2.2」會誤中「12.2x」「2.25」。
-     bestLogoMatch 把清單每一筆都算分數，回傳分數最高的那一筆：
+     bestLogoMatch 把清單每一筆都算一個比對等級，回傳等級最高的那一筆：
        完全相等  >  工單文字包含關鍵字(關鍵字越長越準)  >  關鍵字包含工單文字
-     同分才看清單順序。findByBrandText 還留著給 matchProduct 用，邏輯沒動。 */
+       >  模糊比對(差一兩個字，見下面fuzzyDistance)
+     前兩個等級同分才看清單順序；後兩個等級同分當成比對不到(見bestLogoMatch)。
+     findByBrandText 還留著給 matchProduct 用，邏輯沒動。 */
   function isDigitCh(ch){ return ch >= '0' && ch <= '9'; }
 
   /* needle 出現在 hay 的 idx 位置時，確認不是「切在一串數字/日期中間」：
@@ -101,38 +112,107 @@ var AssetMatcher = (function(){
     return false;
   }
 
-  /* 一段(已標準化的)工單文字 nt 對上一個候選字串 cand 的分數，0=沒中。
-     allowReverse：要不要接受「候選字串包含工單文字」這個方向（工單只寫
-     一部分，例如寫「婦幼展」對到「蝦皮婦幼展」）。 */
-  function scoreCandidate(nt, cand, allowReverse){
+  /* ── 模糊比對（容錯字）────────────────────────────────────
+     工單不一定會打得跟資料庫一模一樣（「蝦皮寵物節」其實是「蝦皮寵物展」、
+     「從齒完美」其實是「從齒玩美」、「時尚周」/「時尚週」），所以在完全相等／
+     包含都比對不到之後，再補一層「差一兩個字也算」的比對：
+       候選字串 4～7 個字 → 容許差 1 個字（打錯、多打、少打都算）
+       候選字串 8 個字以上 → 容許差 2 個字
+       候選字串 3 個字以下 → 不做（太短，差一個字就可能是另一個活動）
+       候選字串裡有數字 → 不做（「2.2購物節」跟「3.3購物節」只差一個字，
+                            但是完全不同的檔期，日期一定要打對）
+     比對時是拿工單文字裡「長度差不多的一小段」去比，所以前後多寫了
+     「_LOGO」之類的字也沒關係。 */
+  function fuzzyAllowance(len){ return len >= 8 ? 2 : (len >= 4 ? 1 : 0); }
+
+  /* 兩段文字的編輯距離（改一個字/多一個字/少一個字各算1），超過max就不用
+     算得很精確，直接回傳max+1。 */
+  function editDistance(a, b, max){
+    var la = a.length, lb = b.length;
+    if(Math.abs(la - lb) > max) return max + 1;
+    var prev = [], cur = [], i, j;
+    for(j = 0; j <= lb; j++) prev[j] = j;
+    for(i = 1; i <= la; i++){
+      cur[0] = i;
+      var rowMin = cur[0];
+      for(j = 1; j <= lb; j++){
+        var cost = a.charAt(i-1) === b.charAt(j-1) ? 0 : 1;
+        cur[j] = Math.min(prev[j] + 1, cur[j-1] + 1, prev[j-1] + cost);
+        if(cur[j] < rowMin) rowMin = cur[j];
+      }
+      if(rowMin > max) return max + 1;
+      var t = prev; prev = cur; cur = t;
+    }
+    return prev[lb];
+  }
+
+  /* 工單文字 nt 裡有沒有一段跟 nk 只差一兩個字。回傳差幾個字，沒有就回傳-1。 */
+  function fuzzyDistance(nt, nk){
+    var allow = fuzzyAllowance(nk.length);
+    if(!allow || /[0-9]/.test(nk)) return -1;
+    var best = allow + 1;
+    for(var wl = nk.length - allow; wl <= nk.length + allow; wl++){
+      if(wl < 1 || wl > nt.length) continue;
+      for(var i = 0; i + wl <= nt.length; i++){
+        var d = editDistance(nt.substr(i, wl), nk, allow);
+        if(d < best) best = d;
+      }
+    }
+    return best <= allow ? best : -1;
+  }
+
+  /* 比對等級（數字越大越可信）：
+       3 完全相等
+       2 工單文字包含候選字串（候選字串越長越準）
+       1 候選字串包含工單文字（工單只寫一部分，例如「婦幼展」→「蝦皮婦幼展」）
+       0 模糊比對（差一兩個字）
+     回傳 {tier, value}，沒中回傳 null。value 只在同一個等級裡互相比較。 */
+  function scoreCandidate(nt, cand, allowReverse, allowFuzzy){
     var nk = normKey(cand);
-    if(!nk) return 0;
-    if(nk === nt) return 3000000 + nk.length;
-    if(containsWithBoundary(nt, nk)) return 2000000 + nk.length * 1000;
-    // 反方向：工單文字越長越可信；同樣長度時，候選字串越短(越接近整串相等)越優先
-    if(allowReverse && nt.length >= 2 && containsWithBoundary(nk, nt)) return 1000000 + nt.length * 1000 - nk.length;
-    return 0;
+    if(!nk) return null;
+    if(nk === nt) return { tier:3, value:nk.length };
+    if(containsWithBoundary(nt, nk)) return { tier:2, value:nk.length };
+    if(allowReverse && nt.length >= 2 && containsWithBoundary(nk, nt)) return { tier:1, value:0 };
+    if(allowFuzzy){
+      var d = fuzzyDistance(nt, nk);
+      if(d >= 0) return { tier:0, value:-d };
+    }
+    return null;
+  }
+
+  function betterScore(a, b){
+    if(!b) return true;
+    return a.tier > b.tier || (a.tier === b.tier && a.value > b.value);
   }
 
   /* opts:
        useBrand     —— 要不要拿 brand 欄位當候選字串
-       reverseBrand —— brand 要不要接受反方向(見scoreCandidate)
-       reverseKeys  —— matchKeys 要不要接受反方向。一般LOGO文字不開，避免
+       reverseBrand —— brand 要不要接受「候選字串包含工單文字」這個方向
+       reverseKeys  —— matchKeys 要不要接受這個方向。一般LOGO文字不開，避免
                        工單只寫很短的字(例如"logo")就誤中「OOTD_LOGO」這類
-                       關鍵字；內建代碼(有\或/)才開，維持原本findByMatchKeys
-                       的雙向行為。 */
+                       關鍵字；內建代碼(有\\或/)才開，維持原本的雙向行為。
+       fuzzy        —— 要不要開模糊比對（差一兩個字也算）
+
+     等級1、0是「猜」的，所以多一個限制：同一個等級如果有兩筆以上不同的
+     LOGO都符合（例如只寫「年貨節」，美食年貨節/居家年貨節都中；只寫
+     「家電祭」，涼夏/狂購都中），就當成比對不到、列進警示讓人手動選，
+     不要自己挑一張帶進去——帶錯圖比沒帶圖更難發現。 */
   function bestLogoMatch(list, text, opts){
     var nt = normKey(text);
     if(!nt) return null;
-    var best = null, bestScore = 0;
+    var best = null, bestScore = null, sameLevelCount = 0;
     list.forEach(function(it){
-      var s = 0;
-      if(opts.useBrand && it.brand) s = Math.max(s, scoreCandidate(nt, it.brand, opts.reverseBrand));
+      var s = null;
+      function consider(c){ if(c && betterScore(c, s)) s = c; }
+      if(opts.useBrand && it.brand) consider(scoreCandidate(nt, it.brand, opts.reverseBrand, opts.fuzzy));
       (it.matchKeys||[]).forEach(function(k){
-        s = Math.max(s, scoreCandidate(nt, k, opts.reverseKeys));
+        consider(scoreCandidate(nt, k, opts.reverseKeys, opts.fuzzy));
       });
-      if(s > bestScore){ best = it; bestScore = s; }
+      if(!s) return;
+      if(betterScore(s, bestScore)){ best = it; bestScore = s; sameLevelCount = 1; }
+      else if(s.tier === bestScore.tier && s.value === bestScore.value) sameLevelCount++;
     });
+    if(best && bestScore.tier <= 1 && sameLevelCount > 1) return null;
     return best;
   }
 
@@ -178,7 +258,7 @@ var AssetMatcher = (function(){
   /* ── LOGO ──────────────────────────────────────────────── */
   function matchLogo(rawLogoValue, brandText){
     var raw = String(rawLogoValue||'').trim();
-    if(!raw || raw === '無') return { src:null, source:'none' };
+    if(!raw || isNoLogoMark(raw)) return { src:null, source:'none' };
 
     if(isBuiltinRef(raw)){
       var lib = bestLogoMatch(flattenLogos(), raw, { useBrand:false, reverseKeys:true });
@@ -201,9 +281,14 @@ var AssetMatcher = (function(){
     // 每一段文字都用bestLogoMatch挑最符合的一筆：brand雙向、matchKeys只看
     // 「文字包含關鍵字」單一方向（例如工單寫 Watsons，靠matchKeys裡登記的
     // "Watsons"比對到屈臣氏；不開反方向，避免工單只寫很短的字就誤中一堆）。
+    // 模糊比對(差一兩個字，fuzzy:true)只用在LOGO欄，而且排在最後：LOGO欄、
+    // 檔期欄都沒有明確比對到，才回頭用LOGO欄的文字猜。檔期欄不做模糊比對
+    // ——它只是備援線索，拿它去猜容易把不相干的活動帶進來。
     var logos = flattenLogos();
     var dbOpts = { useBrand:true, reverseBrand:true, reverseKeys:false };
-    var dbHit = bestLogoMatch(logos, cleaned, dbOpts) || bestLogoMatch(logos, brandText, dbOpts);
+    var fuzzyOpts = { useBrand:true, reverseBrand:true, reverseKeys:false, fuzzy:true };
+    var dbHit = bestLogoMatch(logos, cleaned, dbOpts) || bestLogoMatch(logos, brandText, dbOpts)
+      || bestLogoMatch(logos, cleaned, fuzzyOpts);
     if(dbHit) return Object.assign({ src: dbHit.path, source:'database', note:null }, logoPresetFields(dbHit));
 
     return { src:null, source:'unmatched', note:'LOGO「'+raw+'」在這批資料夾跟資料庫都比對不到，需要手動上傳或選擇' };
@@ -244,6 +329,7 @@ var AssetMatcher = (function(){
   return {
     normKey: normKey,
     isBuiltinRef: isBuiltinRef,
+    isNoLogoMark: isNoLogoMark,
     matchLogo: matchLogo,
     logoPresetFields: logoPresetFields,
     matchProduct: matchProduct,
