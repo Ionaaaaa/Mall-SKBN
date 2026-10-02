@@ -162,6 +162,11 @@ body{ font-family:"ShopeeNoto","Noto Sans TC","Microsoft JhengHei",sans-serif; b
 .status-icon-yes, .status-icon-no{ width:13px; height:13px; flex:none; }
 .status-icon-yes{ color:#2ecc71; }
 .status-icon-no{ color:#888; }
+/* LOGO那一行：工單寫的名稱＋勾/叉(圖示接在名稱後面)。沒比對到圖的用橘色，
+   跟「不需要/工單未填」(灰色)區分開。 */
+.import-status-named svg{ vertical-align:-2px; margin-left:4px; }
+.import-status-miss{ color:#e67e22; }
+.import-status-miss .status-icon-no{ color:inherit; }
 
 /* 放大編輯視窗顏色選擇器下方的「常用配色」快捷色票：純色塊，不寫名稱，
    外層方塊=背景色，中間圓點=文字色，點一下同時套用兩者，不用另外記色碼。 */

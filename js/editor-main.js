@@ -486,7 +486,16 @@ function statusCheckIcon(ok){
    一項一行(不是逗號串在一起)，比較好掃過去看。
      掛標：這個版位有沒有掛標欄位(cfg.tagZone)才顯示，勾/叉看目前
        tagVariant是不是'off'。
-     LOGO：目前這一格是不是已經有可用的LOGO來源(logoRaw)。
+     LOGO：目前這一格是不是已經有可用的LOGO來源(logoRaw)。2026-10：不再只
+       顯示勾/叉，改成把工單LOGO欄原本寫的文字(_importLogoRaw)一起帶出來，
+       一眼看得出「工單要的是哪張、有沒有抓到」——「工單本來就說不用放」跟
+       「工單有寫、但沒抓到圖」是兩回事，後者才需要人處理：
+         有LOGO、工單有寫名稱      → 工單寫的名稱＋綠色勾
+         有LOGO、工單沒寫名稱      → 綠色勾（工單寫無/-/空白，或不是匯入的）
+         工單寫「無」或「-」        → 不需要
+         工單那一欄是空的          → 工單未填
+         工單有寫名稱、但沒比對到  → 工單寫的名稱＋叉(橘色)
+         不是從工單匯入的格子      → 維持原本的叉
      底色：靠slot._importBgColorSpecified分辨是Excel當初就寫死的顏色，
        還是系統自動配色/抓色——這個旗標在匯入當下就固定了，之後
        applyAutoBackground不管走哪個分支都不會回頭改寫它。
@@ -501,7 +510,23 @@ function computeImportStatusHTML(slot, cfg){
   }
 
   var logoOk = !!slot.logoRaw;
-  rows.push('<div class="import-status-row"><span>LOGO</span>'+statusCheckIcon(logoOk)+'</div>');
+  var logoCell;
+  var logoImportText = String(slot._importLogoRaw||'').trim();
+  var logoImportNone = !logoImportText || (typeof AssetMatcher !== 'undefined' && AssetMatcher.isNoLogoMark(logoImportText));
+  if(logoOk){
+    logoCell = logoImportNone
+      ? statusCheckIcon(true)
+      : '<span class="import-status-named">'+escHtml(logoImportText)+statusCheckIcon(true)+'</span>';
+  } else if(slot._importLogoRaw === undefined){
+    logoCell = statusCheckIcon(false);
+  } else if(!logoImportText){
+    logoCell = '<span>工單未填</span>';
+  } else if(logoImportNone){
+    logoCell = '<span>不需要</span>';
+  } else {
+    logoCell = '<span class="import-status-named import-status-miss">'+escHtml(logoImportText)+statusCheckIcon(false)+'</span>';
+  }
+  rows.push('<div class="import-status-row"><span>LOGO</span>'+logoCell+'</div>');
 
   var bgLabel = slot._importBgColorSpecified ? '指定色' : (slot.bgColor ? '系統配色' : '未設定');
   rows.push('<div class="import-status-row"><span>底色</span><span>'+escHtml(bgLabel)+'</span></div>');

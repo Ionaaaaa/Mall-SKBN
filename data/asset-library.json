@@ -569,7 +569,8 @@
           "path": "system-elements/common/limited-time-sale_logo.png",
           "matchKeys": [
             "限時特賣",
-            "限時特賣_LOGO"
+            "限時特賣_LOGO",
+            "CFS"
           ],
           "presetColors": [
             { "bg": "#fd5401", "text": "#f9ff39" },
