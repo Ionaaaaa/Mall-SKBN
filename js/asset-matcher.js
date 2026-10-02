@@ -62,33 +62,78 @@ var AssetMatcher = (function(){
     return hit || null;
   }
 
-  /* 依 matchKeys 陣列比對內建代碼類的 LOGO（檔期限定/常用建檔，見
-     data/asset-library.json 裡的 matchKeys 欄位）。用「包含」比對，因為
-     matchKeys 通常是完整路徑代碼裡「有識別度的那一段」，不用整串相等。 */
-  function findByMatchKeys(list, rawText){
-    var nr = normKey(rawText);
-    if(!nr) return null;
-    var hit = list.find(function(it){
-      return (it.matchKeys||[]).some(function(k){
-        var nk = normKey(k);
-        return nk && (nr.indexOf(nk) >= 0 || nk.indexOf(nr) >= 0);
-      });
-    });
-    return hit || null;
+  /* ── 2026-10：LOGO比對改成「挑最符合的一筆」────────────────
+     原本的 findByBrandText/findByMatchKeys/findByKeyInText 都是「清單裡第一個
+     有包含關係的就回傳」，會有兩個問題：
+       (a) 短的搶走長的：工單寫「蝦皮直營3C家電」會先中「蝦皮直營」；日期類
+           關鍵字更明顯，「11.11」裡面就包含「1.11」，誰排前面誰贏。
+       (b) 沒有數字邊界：「2.2」會誤中「12.2x」「2.25」。
+     bestLogoMatch 把清單每一筆都算分數，回傳分數最高的那一筆：
+       完全相等  >  工單文字包含關鍵字(關鍵字越長越準)  >  關鍵字包含工單文字
+     同分才看清單順序。findByBrandText 還留著給 matchProduct 用，邏輯沒動。 */
+  function isDigitCh(ch){ return ch >= '0' && ch <= '9'; }
+
+  /* needle 出現在 hay 的 idx 位置時，確認不是「切在一串數字/日期中間」：
+     needle 開頭是數字 → 前一個字不能是數字，也不能是「數字+小數點」
+     needle 結尾是數字 → 後一個字不能是數字，也不能是「小數點+數字」
+     所以「1.11」不會中「11.11」、「2.2」不會中「12.2」「2.25」，但
+     「2.2購物節」「2.2.png」「2.2/01_LOGO」這種照樣比對得到。 */
+  function digitBoundaryOk(hay, idx, needle){
+    var len = needle.length;
+    if(isDigitCh(needle.charAt(0))){
+      var p1 = hay.charAt(idx-1), p2 = hay.charAt(idx-2);
+      if(isDigitCh(p1) || (p1 === '.' && isDigitCh(p2))) return false;
+    }
+    if(isDigitCh(needle.charAt(len-1))){
+      var n1 = hay.charAt(idx+len), n2 = hay.charAt(idx+len+1);
+      if(isDigitCh(n1) || (n1 === '.' && isDigitCh(n2))) return false;
+    }
+    return true;
   }
 
-  /* 工單文字「包含」清單裡某一筆的任何一個matchKeys就算命中（單向：文字包含
-     關鍵字，不是關鍵字包含文字）。找不到回傳 null。 */
-  function findByKeyInText(list, text){
+  function containsWithBoundary(hay, needle){
+    if(!hay || !needle) return false;
+    var from = 0, idx;
+    while((idx = hay.indexOf(needle, from)) >= 0){
+      if(digitBoundaryOk(hay, idx, needle)) return true;
+      from = idx + 1;
+    }
+    return false;
+  }
+
+  /* 一段(已標準化的)工單文字 nt 對上一個候選字串 cand 的分數，0=沒中。
+     allowReverse：要不要接受「候選字串包含工單文字」這個方向（工單只寫
+     一部分，例如寫「婦幼展」對到「蝦皮婦幼展」）。 */
+  function scoreCandidate(nt, cand, allowReverse){
+    var nk = normKey(cand);
+    if(!nk) return 0;
+    if(nk === nt) return 3000000 + nk.length;
+    if(containsWithBoundary(nt, nk)) return 2000000 + nk.length * 1000;
+    // 反方向：工單文字越長越可信；同樣長度時，候選字串越短(越接近整串相等)越優先
+    if(allowReverse && nt.length >= 2 && containsWithBoundary(nk, nt)) return 1000000 + nt.length * 1000 - nk.length;
+    return 0;
+  }
+
+  /* opts:
+       useBrand     —— 要不要拿 brand 欄位當候選字串
+       reverseBrand —— brand 要不要接受反方向(見scoreCandidate)
+       reverseKeys  —— matchKeys 要不要接受反方向。一般LOGO文字不開，避免
+                       工單只寫很短的字(例如"logo")就誤中「OOTD_LOGO」這類
+                       關鍵字；內建代碼(有\或/)才開，維持原本findByMatchKeys
+                       的雙向行為。 */
+  function bestLogoMatch(list, text, opts){
     var nt = normKey(text);
     if(!nt) return null;
-    var hit = list.find(function(it){
-      return (it.matchKeys||[]).some(function(k){
-        var nk = normKey(k);
-        return nk && nt.indexOf(nk) >= 0;
+    var best = null, bestScore = 0;
+    list.forEach(function(it){
+      var s = 0;
+      if(opts.useBrand && it.brand) s = Math.max(s, scoreCandidate(nt, it.brand, opts.reverseBrand));
+      (it.matchKeys||[]).forEach(function(k){
+        s = Math.max(s, scoreCandidate(nt, k, opts.reverseKeys));
       });
+      if(s > bestScore){ best = it; bestScore = s; }
     });
-    return hit || null;
+    return best;
   }
 
   /* 從這批資料夾裡，依標準化檔名比對，回傳最合適的一個檔案(dataUrl)。
@@ -136,7 +181,7 @@ var AssetMatcher = (function(){
     if(!raw || raw === '無') return { src:null, source:'none' };
 
     if(isBuiltinRef(raw)){
-      var lib = findByMatchKeys(flattenLogos(), raw);
+      var lib = bestLogoMatch(flattenLogos(), raw, { useBrand:false, reverseKeys:true });
       if(lib) return Object.assign({ src: lib.path, source:'database', note:null }, logoPresetFields(lib));
       return { src:null, source:'unmatched', note:'內建LOGO代碼「'+raw+'」資料庫裡還沒有登記，需要手動上傳或補資料庫' };
     }
@@ -149,12 +194,16 @@ var AssetMatcher = (function(){
       return { src: best.dataUrl, source:'batch', note:null };
     }
 
-    // 2026-09：品牌文字比對不到時，再看「工單寫的文字裡有沒有包含這筆LOGO登記的
-    // 任何一個關鍵字(matchKeys)」——例如工單寫 Watsons，資料庫品牌是「屈臣氏」，
-    // 靠matchKeys裡登記的"Watsons"就比對得到。只看「文字包含關鍵字」單一方向，
-    // 避免工單只寫很短的字(例如"logo")就誤中一堆。
-    var dbHit = findByBrandText(flattenLogos(), brandText) || findByBrandText(flattenLogos(), cleaned)
-      || findByKeyInText(flattenLogos(), brandText) || findByKeyInText(flattenLogos(), cleaned);
+    // 2026-10：查資料庫的順序改成「先看LOGO欄寫的文字，比對不到才退回看檔期欄
+    // (brandText)」。原本是檔期欄優先，工單檔期欄寫「蝦皮直營」、LOGO欄寫
+    // 「Apple授權經銷商」時，會先中蝦皮直營、LOGO欄根本沒被看到——LOGO欄才是
+    // 「這一格要放哪張LOGO」的直接指示，應該優先。
+    // 每一段文字都用bestLogoMatch挑最符合的一筆：brand雙向、matchKeys只看
+    // 「文字包含關鍵字」單一方向（例如工單寫 Watsons，靠matchKeys裡登記的
+    // "Watsons"比對到屈臣氏；不開反方向，避免工單只寫很短的字就誤中一堆）。
+    var logos = flattenLogos();
+    var dbOpts = { useBrand:true, reverseBrand:true, reverseKeys:false };
+    var dbHit = bestLogoMatch(logos, cleaned, dbOpts) || bestLogoMatch(logos, brandText, dbOpts);
     if(dbHit) return Object.assign({ src: dbHit.path, source:'database', note:null }, logoPresetFields(dbHit));
 
     return { src:null, source:'unmatched', note:'LOGO「'+raw+'」在這批資料夾跟資料庫都比對不到，需要手動上傳或選擇' };

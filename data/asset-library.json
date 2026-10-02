@@ -74,65 +74,70 @@
       "label": "全站大促",
       "items": [
         {
+          "id": "111sale_logo",
+          "brand": "1.11購物節",
+          "name": "1.11購物節",
+          "type": "logo",
+          "path": "system-elements/site-wide-sale/111sale_logo.png",
+          "matchKeys": [
+            "1.11",
+            "1.11購物節"
+          ]
+        },
+        {
+          "id": "22sale_logo",
+          "brand": "2.2購物節",
+          "name": "2.2購物節",
+          "type": "logo",
+          "path": "system-elements/site-wide-sale/22sale_logo.png",
+          "matchKeys": [
+            "2.2",
+            "2.2購物節"
+          ]
+        },
+        {
+          "id": "33sale_logo",
+          "brand": "3.3購物節",
+          "name": "3.3購物節",
+          "type": "logo",
+          "path": "system-elements/site-wide-sale/33sale_logo.png",
+          "matchKeys": [
+            "3.3",
+            "3.3購物節"
+          ]
+        },
+        {
           "id": "44sale_logo",
           "brand": "4.4購物節",
           "name": "4.4購物節",
           "type": "logo",
-          "path": "system-elements/site-wide-sale/44sale_logo.png"
-        },
-        {
-          "id": "memberday18_logo",
-          "brand": "18號會員日",
-          "name": "18號會員日 LOGO",
-          "type": "logo",
-          "path": "system-elements/site-wide-sale/memberday18_logo.png",
-          "presetBgColor": "#ffa200",
-          "presetTextColor": "#ffff3c"
-        },
-        {
-          "id": "1010anniversary_logo",
-          "brand": "10.10品牌週年慶",
-          "name": "10.10品牌週年慶",
-          "type": "logo",
-          "path": "system-elements/site-wide-sale/1010anniversary_logo.png",
+          "path": "system-elements/site-wide-sale/44sale_logo.png",
           "matchKeys": [
-            "10.10品牌週年慶",
-            "10.10品牌週年慶\\01_LOGO",
-            "10.10品牌週年慶/01_LOGO"
-          ],
-
-          "presetBgColor": "#ee4e2e",
-          "presetTextColor": "#fffd3e"
+            "4.4",
+            "4.4購物節"
+          ]
         },
         {
-          "id": "mall25festival_logo",
-          "brand": "商城25節",
-          "name": "商城25節 ",
+          "id": "55sale_logo",
+          "brand": "5.5購物節",
+          "name": "5.5購物節",
           "type": "logo",
-          "path": "system-elements/site-wide-sale/mall25festival_logo.png",
+          "path": "system-elements/site-wide-sale/55sale_logo.png",
           "matchKeys": [
-            "商城25節",
-            "01_LOGO\\LOGO_白字_無USP",
-            "01_LOGO/LOGO_白字_無USP"
-          ],
-          "_note": "原本叫「0925」是我從9月那份工單裡「9.25」那一列的LOGO代碼直接照抄命名，誤以為是9月專屬的——實際上是每月25號都會用的固定LOGO(商城25節)，已經改成通用命名，之後不管哪個月的25號都會比對到同一筆。檔案還沒上傳，放進system-elements/site-wide-sale/mall25festival_logo.png就會自動生效。",
-          "presetBgColor": "#d0011d",
-          "presetTextColor": "#ffe600"
+            "5.5",
+            "5.5購物節"
+          ]
         },
         {
-          "id": "99brandsale_logo",
-          "brand": "99大促",
-          "name": "99大促",
+          "id": "66sale_logo",
+          "brand": "6.6購物節",
+          "name": "6.6購物節",
           "type": "logo",
-          "path": "system-elements/site-wide-sale/99brandsale_logo.png",
+          "path": "system-elements/site-wide-sale/66sale_logo.png",
           "matchKeys": [
-            "99大促",
-            "9.9品牌週年慶",
-            "99品牌週年慶"
-          ],
-          "presetBgColor": "#ee4e2e",
-          "presetTextColor": "#fffd3e",
-          "_note": "檔案目前還沒上傳，路徑/檔名先登記好；等圖放進 system-elements/site-wide-sale/99brandsale_logo.png 就會自動生效，不用改這份json"
+            "6.6",
+            "6.6購物節"
+          ]
         },
         {
           "id": "618sale_logo",
@@ -146,6 +151,115 @@
             "618大促\\01_LOGO",
             "618大促/01_LOGO"
           ]
+        },
+        {
+          "id": "77sale_logo",
+          "brand": "7.7購物節",
+          "name": "7.7購物節",
+          "type": "logo",
+          "path": "system-elements/site-wide-sale/77sale_logo.png",
+          "matchKeys": [
+            "7.7",
+            "7.7購物節"
+          ]
+        },
+        {
+          "id": "88sale_logo",
+          "brand": "8.8購物節",
+          "name": "8.8購物節",
+          "type": "logo",
+          "path": "system-elements/site-wide-sale/88sale_logo.png",
+          "matchKeys": [
+            "8.8",
+            "8.8購物節"
+          ]
+        },
+        {
+          "id": "99brandsale_logo",
+          "brand": "9.9購物節",
+          "name": "9.9購物節",
+          "type": "logo",
+          "path": "system-elements/site-wide-sale/99brandsale_logo.png",
+          "matchKeys": [
+            "9.9",
+            "9.9購物節",
+            "99購物節",
+            "99大促",
+            "9.9品牌週年慶",
+            "99品牌週年慶"
+          ],
+          "presetBgColor": "#ee4e2e",
+          "presetTextColor": "#fffd3e",
+          "_note": "2026-10：圖檔已放入(LOGO上的字是「9.9購物節」)，品牌名稱從「99大促」改成跟圖一致的「9.9購物節」；原本的關鍵字(99大促/9.9品牌週年慶/99品牌週年慶)都保留，舊工單寫法一樣比對得到。檔名維持原本登記的99brandsale_logo.png。"
+        },
+        {
+          "id": "1010anniversary_logo",
+          "brand": "10.10品牌週年慶",
+          "name": "10.10品牌週年慶",
+          "type": "logo",
+          "path": "system-elements/site-wide-sale/1010anniversary_logo.png",
+          "matchKeys": [
+            "10.10",
+            "10.10品牌週年慶",
+            "10.10品牌週年慶\\01_LOGO",
+            "10.10品牌週年慶/01_LOGO"
+          ],
+          "presetBgColor": "#ee4e2e",
+          "presetTextColor": "#fffd3e"
+        },
+        {
+          "id": "1111sale_logo",
+          "brand": "11.11最強購物節",
+          "name": "11.11最強購物節",
+          "type": "logo",
+          "path": "system-elements/site-wide-sale/1111sale_logo.png",
+          "matchKeys": [
+            "11.11",
+            "11.11最強購物節"
+          ],
+          "_note": "這張LOGO的數字帶彩色立體邊(不是純白)。目前大促類(siteWideSale)匯入時會固定開「強制白色」，彩色邊會一起變成白色剪影；想保留彩色的話，在放大編輯面板把強制白色關掉即可。"
+        },
+        {
+          "id": "1212birthday_logo",
+          "brand": "12.12狂歡生日慶",
+          "name": "12.12狂歡生日慶",
+          "type": "logo",
+          "path": "system-elements/site-wide-sale/1212birthday_logo.png",
+          "matchKeys": [
+            "12.12",
+            "12.12狂歡生日慶"
+          ],
+          "_note": "這張LOGO的數字帶彩色立體邊(不是純白)。目前大促類(siteWideSale)匯入時會固定開「強制白色」，彩色邊會一起變成白色剪影；想保留彩色的話，在放大編輯面板把強制白色關掉即可。"
+        },
+        {
+          "id": "memberday18_logo",
+          "brand": "18號會員日",
+          "name": "18號會員日 LOGO",
+          "type": "logo",
+          "path": "system-elements/site-wide-sale/memberday18_logo.png",
+          "matchKeys": [
+            "18號會員日",
+            "18會員日"
+          ],
+          "presetBgColor": "#ffa200",
+          "presetTextColor": "#ffff3c"
+        },
+        {
+          "id": "mall25festival_logo",
+          "brand": "商城25節",
+          "name": "商城25節 ",
+          "type": "logo",
+          "path": "system-elements/site-wide-sale/mall25festival_logo.png",
+          "matchKeys": [
+            "商城25節",
+            "25號商城狂購節",
+            "商城狂購節",
+            "01_LOGO\\LOGO_白字_無USP",
+            "01_LOGO/LOGO_白字_無USP"
+          ],
+          "_note": "原本叫「0925」是我從9月那份工單裡「9.25」那一列的LOGO代碼直接照抄命名，誤以為是9月專屬的——實際上是每月25號都會用的固定LOGO(商城25節)，已經改成通用命名，之後不管哪個月的25號都會比對到同一筆。檔案還沒上傳，放進system-elements/site-wide-sale/mall25festival_logo.png就會自動生效。",
+          "presetBgColor": "#d0011d",
+          "presetTextColor": "#ffe600"
         }
       ]
     },
@@ -181,7 +295,7 @@
             "蝦皮直營 3C家電",
             "蝦皮直營+3C家電"
           ],
-          "_note": "這張跟上面「蝦皮直營 LOGO」是不同檔——這張下面多印了「3C家電」一行副標，只適合3C家電類的檔期。目前的比對邏輯是「文字包含關鍵字」雙向比對品牌欄位，如果工單品牌欄位寫的文字同時含有「蝦皮直營」跟「3C家電」，可能會比對到上面那筆單純版而不是這筆——如果你們的工單真的會用到這個雙行版，麻煩告訴我實際工單會怎麼寫（例如LOGO欄位是不是會直接寫「蝦皮直營3C家電」或用路徑代碼\\的形式），我再調整比對規則或改用手動選擇比較保險。"
+          "_note": "這張跟上面「蝦皮直營 LOGO」是不同檔——這張下面多印了「3C家電」一行副標，只適合3C家電類的檔期。2026-10：比對規則已改成「符合的字最長的那一筆優先」(見js/asset-matcher.js的bestLogoMatch)，工單寫「蝦皮直營3C家電」會比對到這筆，只寫「蝦皮直營」才會比對到上面那筆單純版，不會再互搶。"
         },
         {
           "id": "brand-member_logo",
@@ -252,7 +366,9 @@
           "path": "system-elements/common/apple-authorized-reseller_logo.png",
           "matchKeys": [
             "Apple授權經銷商",
-            "Apple 授權經銷商"
+            "Apple 授權經銷商",
+            "Apple授權經銷",
+            "Apple經銷"
           ],
           "_note": "這張圖是純白色(只有透明度沒有顏色資訊)，只有放在深色/有顏色的背景上才看得到，背景太淺的話logo會直接消失，需要的話要手動指定背景色。"
         }
