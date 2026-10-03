@@ -267,6 +267,9 @@ function resolveSlot(slot, banner, bannerIdx, key, warnings){
        一次，見loadImage的cache機制）。 */
     function applyLogoWhiteAuto(){
       if(logoResult.source !== 'database') return;
+      // 2026-10：資料庫登記keepOriginalColor:true的LOGO(例如蝦皮時尚週)固定用
+      // 原本的顏色，不管是哪個分類、背景多深都不自動開強制白色。
+      if(logoResult.keepOriginalColor){ slot.logoForceWhite = false; return; }
       if(logoResult.categoryKey === 'siteWideSale'){
         slot.logoForceWhite = true;
       } else if(logoResult.categoryKey === 'festival' || logoResult.categoryKey === 'common'){

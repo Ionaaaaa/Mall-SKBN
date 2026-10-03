@@ -251,7 +251,14 @@ var AssetMatcher = (function(){
       // 的膠囊模式包起來才好看，這種在json裡登記forceTrimMode:true，
       // 不管是Excel匯入自動比對到、還是使用者自己手動瀏覽資料庫選到，都會
       // 直接套用trim模式（含自動底色偵測，見modules/logo-module.js）。
-      forceTrimMode: !!it.forceTrimMode
+      forceTrimMode: !!it.forceTrimMode,
+      // 2026-10：這張LOGO固定用原本的顏色，匯入時不要自動開「強制白色」。
+      // 給本身就是做好黑白/彩色配置、反白之後會壞掉的LOGO用（例如蝦皮時尚週：
+      // 白底黑字+黑底白字兩塊拼起來，白色那塊是實心的，強制白色會變成一整塊
+      // 白色剪影、字看不到）。json裡登記keepOriginalColor:true，見
+      // editor-import.js的applyLogoWhiteAuto。使用者事後在放大編輯面板手動
+      // 切換強制白色不受這個限制。
+      keepOriginalColor: !!it.keepOriginalColor
     };
   }
 
@@ -299,8 +306,16 @@ var AssetMatcher = (function(){
     var raw = String(artContent||'').trim();
     if(!raw || raw === '無') return { src:null, source:'none' };
 
-    var norm = BatchAssets.normalizeName(raw);
-    var candidates = BatchAssets.findAllByNormalized(norm);
+    // 2026-10：商品這一格的「/」不當成資料夾路徑。工單常把日期寫進檔名
+    // （例如 10/24_Fashion-時尚週_換季限時瘋搶），但Windows檔名不能有「/」，
+    // 丟圖區的實際檔案會存成「10 24_…」；normalizeName看到「/」會當成路徑、
+    // 只留斜線後面那段，前面的「10」被丟掉就比對不到。這裡先把「/」(全形
+    // 「／」也算)換成空白再標準化，空白本來就會被去掉，兩邊就一致了。
+    // 只改商品這一格：LOGO欄的「/」「\」是內建代碼(見isBuiltinRef)，不能動。
+    // 比對不到時再退回原本「當成路徑、只看最後一段」的做法，工單真的寫了
+    // 「子資料夾/檔名」的情況照舊比對得到。
+    var candidates = BatchAssets.findAllByNormalized(BatchAssets.normalizeName(raw.replace(/[\/\uFF0F]/g, ' ')));
+    if(!candidates.length) candidates = BatchAssets.findAllByNormalized(BatchAssets.normalizeName(raw));
     if(candidates.length){
       var best = pickBestBatchFile(raw, candidates);
       return { src: best.dataUrl, source:'batch', note:null };
