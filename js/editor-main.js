@@ -33,6 +33,58 @@ function renderAll(){
   renderIssuesPanel();
   renderProductionList();
   updateActiveListItem();
+  _staleSelectionBanners = [];
+}
+
+/* ── 2026-10 效能：只重畫有改到的那幾組 ──────────────────────────────
+   renderAll()是把主畫面整個清空、每一組從頭重建。原本不管做什麼(拖曳放開、
+   方向鍵微調、改日期、換圖、還原、關閉放大編輯)都呼叫它，只動1格也要重建
+   全部7組21格，組數越多越慢。
+   renderBanners(list)只把list裡那幾組的卡片換掉(原地替換，其他組的DOM完全
+   不動)，右側警示面板、左側製作物列表照樣更新。
+   用在「只影響單一組」的操作；會動到很多組或改變組數/順序的(匯入、新增、
+   複製、刪除、套用到其他格、載入草稿)還是用renderAll()。
+
+   選取框：主畫面同時間只能有一個選取框。點了某一格，其他格的選取狀態會被
+   deselectAllSlotsExcept()清掉，但那些格子的畫面要等重畫才會把框收掉——
+   原本靠renderAll()順便全部重畫；現在deselectAllSlotsExcept()會把「原本
+   有選取框、被清掉」的那幾組記在_staleSelectionBanners，下一次
+   renderBanners()時一起重畫，框才會跟以前一樣收乾淨。
+   找不到對應的卡片(例如組數已經變了)就退回renderAll()，不會留下畫面跟
+   資料對不上的狀態。 */
+var _staleSelectionBanners = [];
+
+function renderBanners(list){
+  var targets = [];
+  (list || []).concat(_staleSelectionBanners).forEach(function(b){
+    if(b && targets.indexOf(b) < 0) targets.push(b);
+  });
+  _staleSelectionBanners = [];
+  if(!targets.length){ renderAll(); return; }
+  var jobs = [];
+  for(var i=0;i<targets.length;i++){
+    var idx = STATE.banners.indexOf(targets[i]);
+    var old = (idx >= 0) ? document.getElementById('banner-card-'+idx) : null;
+    if(!old || !old.parentNode){ renderAll(); return; }
+    jobs.push({ banner: targets[i], idx: idx, old: old });
+  }
+  jobs.forEach(function(j){
+    j.old.parentNode.replaceChild(buildBannerCard(j.banner, j.idx), j.old);
+  });
+  renderIssuesPanel();
+  renderProductionList();
+  updateActiveListItem();
+}
+
+/* 某一格(slot)屬於哪一組。找不到回傳null(呼叫端會退回renderAll)。 */
+function findBannerOfSlot(slot){
+  for(var i=0;i<STATE.banners.length;i++){
+    var banner = STATE.banners[i];
+    for(var k=0;k<Core.SLOT_KEYS.length;k++){
+      if(banner[Core.SLOT_KEYS[k]] === slot) return banner;
+    }
+  }
+  return null;
 }
 
 /* ── 左側「製作物列表」：跟krcb專案同一個精神，清單項目跟捲動位置互相同步 ──
@@ -111,7 +163,7 @@ function buildBannerCard(banner, idx){
     '</div>';
   head.querySelector('.banner-date-input').onchange = function(){
     banner.date = this.value || null;
-    renderAll();
+    renderBanners([banner]);
   };
   head.querySelector('[data-act=dl]').onclick = function(){ downloadSingleBannerWithCheck(banner, idx); };
   head.querySelector('[data-act=dup]').onclick = function(){
@@ -122,7 +174,7 @@ function buildBannerCard(banner, idx){
   card.appendChild(head);
 
   var stage = Core.buildBannerStage(banner, STAGE_WIDTH, {
-    onChange: function(){ pushMainUndoCheckpoint(); renderAll(); }, // 拖曳結束才會呼叫到，一次拖曳只記一筆還原紀錄
+    onChange: function(){ pushMainUndoCheckpoint(); renderBanners([banner]); }, // 拖曳結束才會呼叫到，一次拖曳只記一筆還原紀錄
     onExpand: function(key){ openExpandModal(banner, key); },
     onRequestPick: function(key, kind){ quickPick(banner[key], kind); },
     // 主畫面同時有好幾組banner在畫面上，點選任何一格的logo/商品，其他所有
@@ -167,8 +219,9 @@ function confirmDeleteBanner(banner){
 /* 主畫面上直接點版位（不放大）要換圖：直接跳系統檔案選擇，不跳自訂popup */
 function quickPick(slot, kind){
   Assets.pickImage(function(d){
-    if(kind === 'logo'){ slot.logoRaw = d; clearLogoPresets(slot); Modules.logo.applyProcessing(slot, renderAll); return; }
-    if(kind === 'product'){ setUploadedProductSrc(slot, d); renderAll(); return; }
+    function rerender(){ renderBanners([findBannerOfSlot(slot)]); }
+    if(kind === 'logo'){ slot.logoRaw = d; clearLogoPresets(slot); Modules.logo.applyProcessing(slot, rerender); return; }
+    if(kind === 'product'){ setUploadedProductSrc(slot, d); rerender(); return; }
   });
 }
 
@@ -324,6 +377,24 @@ function snapshotSlot(slot){
   return copy;
 }
 
+/* 2026-10 效能：比較兩份快照一不一樣。原本是 JSON.stringify(a) !== JSON.stringify(b)
+   ——快照裡有整張圖片的dataURL(logoRaw/logoSrc/productSrc，一張可以到好幾MB)，
+   等於每動一下顏色/滑桿就把整張圖轉成字串兩次來比。改成逐欄位比：同一個值
+   (包含同一張圖的字串)直接用===，只有陣列/物件這種小東西才轉字串比內容。
+   結果跟原本一樣：欄位值是undefined跟「沒有這個欄位」視為相同。 */
+function sameSnapshot(a, b){
+  if(!a || !b) return a === b;
+  var keys = Object.keys(a);
+  Object.keys(b).forEach(function(k){ if(keys.indexOf(k) < 0) keys.push(k); });
+  for(var i=0;i<keys.length;i++){
+    var va = a[keys[i]], vb = b[keys[i]];
+    if(va === vb) continue;
+    if(va && vb && typeof va === 'object' && typeof vb === 'object' && JSON.stringify(va) === JSON.stringify(vb)) continue;
+    return false;
+  }
+  return true;
+}
+
 /* 每次refreshModalStage(每個欄位變更/每次拖曳結束都會呼叫到)重畫之前，
    先比對「這次重畫前」的草稿快照跟上一次記錄的快照：不一樣才代表真的有
    一個變更完成了，把「變更前」那個快照推進undo堆疊。拖曳中的每個
@@ -332,7 +403,7 @@ function snapshotSlot(slot){
 function pushUndoCheckpoint(){
   var snap = snapshotSlot(_modalCtx.slot);
   var prev = _modalCtx.lastSnapshot;
-  if(prev && JSON.stringify(prev) !== JSON.stringify(snap)){
+  if(prev && !sameSnapshot(prev, snap)){
     _modalCtx.undoStack.push(prev);
     if(_modalCtx.undoStack.length > 50) _modalCtx.undoStack.shift(); // 上限50筆，避免無限累積佔記憶體
   }
@@ -382,7 +453,7 @@ function pushMainUndoCheckpoint(){
     return;
   }
   var snap = snapshotSlot(sel.slot);
-  if(JSON.stringify(_mainUndo.lastSnapshot) !== JSON.stringify(snap)){
+  if(!sameSnapshot(_mainUndo.lastSnapshot, snap)){
     _mainUndo.stack.push({ slot: sel.slot, snapshot: _mainUndo.lastSnapshot });
     if(_mainUndo.stack.length > 50) _mainUndo.stack.shift();
   }
@@ -396,7 +467,7 @@ function undoMain(){
   entry.slot.materialTexts = (entry.snapshot.materialTexts || []).slice();
   _mainUndo.lastRef = entry.slot;
   _mainUndo.lastSnapshot = snapshotSlot(entry.slot);
-  renderAll();
+  renderBanners([findBannerOfSlot(entry.slot)]);
 }
 
 /* 鍵盤操作：Ctrl/Cmd+Z還原上一步，方向鍵微調目前選取物件(商品圖/LOGO)
@@ -450,7 +521,7 @@ document.addEventListener('keydown', function(e){
   }
   e.preventDefault();
   pushMainUndoCheckpoint();
-  renderAll();
+  renderBanners([sel.banner]);
 });
 
 /* ── 左側：物件（商品圖／LOGO／掛標）切換 + 上傳，一次只顯示一個分頁的內容 ── */
@@ -605,7 +676,6 @@ function buildModalObjectsHTML(key, cfg, slot){
           '<button class="angle-btn" data-white="1">強制白色</button>'+
         '</div>'+
       '</div>'+
-      '<div class="hint-sm">「裁切+色底」的色塊固定不動，LOGO素材可以在裡面滾輪縮放/拖曳捲動。「強制白色」會把LOGO整個變成白色剪影，不用另外準備白色版檔案（只對有去背透明背景的PNG有效，JPG沒有透明資訊會整塊變白）。點畫布上的LOGO會出現選取框。</div>'+
     '</div>';
 
   if(cfg.tagZone){
@@ -1036,11 +1106,11 @@ function bindModalSettingsFields(settings, slot, cfg){
     slot.bgColor = this.value;
     slot.titleColor = ColorUtils.pickTextColorForBackground(slot.bgColor);
     document.getElementById('f-titlecolor').value = slot.titleColor;
-    refreshModalStage();
+    scheduleModalRefresh();
   };
 
   document.getElementById('f-titlecolor').value = /^#[0-9a-f]{6}$/i.test(slot.titleColor||'') ? slot.titleColor : '#ffffff';
-  document.getElementById('f-titlecolor').oninput = function(){ slot.titleColor = this.value; refreshModalStage(); };
+  document.getElementById('f-titlecolor').oninput = function(){ slot.titleColor = this.value; scheduleModalRefresh(); };
 
   bindPresetChips(slot);
 
@@ -1057,11 +1127,11 @@ function bindModalSettingsFields(settings, slot, cfg){
 
   var shadowX = document.getElementById('f-shadow-x');
   shadowX.value = slot.shadowOffsetX || 0;
-  shadowX.oninput = function(){ slot.shadowOffsetX = Number(shadowX.value); refreshModalStage(); };
+  shadowX.oninput = function(){ slot.shadowOffsetX = Number(shadowX.value); scheduleModalRefresh(); };
 
   var shadowY = document.getElementById('f-shadow-y');
   shadowY.value = slot.shadowOffsetY || 0;
-  shadowY.oninput = function(){ slot.shadowOffsetY = Number(shadowY.value); refreshModalStage(); };
+  shadowY.oninput = function(){ slot.shadowOffsetY = Number(shadowY.value); scheduleModalRefresh(); };
 
   document.getElementById('f-shadow-reset').onclick = function(){
     slot.productOffsetX = 0; slot.productOffsetY = 0; slot.productScale = 1; slot.productRot = 0;
@@ -1549,7 +1619,22 @@ function syncProductLibrarySelect(slot){
   sel.value = match ? slot.productSrc : '';
 }
 
+/* 2026-10 效能：拖色盤、拉滑桿時瀏覽器會連續送出很多次'input'，原本每一次
+   都立刻把整個預覽重建一遍；重建比事件來得慢的時候就會越積越多、畫面跟不上
+   手。scheduleModalRefresh()改成「每個畫面(frame)最多重畫一次」：同一個畫面
+   內來了好幾次，只用最後的值畫一次。只給這種連續觸發的欄位用；按鈕、拖曳
+   放開這些一次性的操作照舊直接呼叫refreshModalStage()。 */
+var _modalRefreshRaf = 0;
+function scheduleModalRefresh(){
+  if(_modalRefreshRaf) return;
+  _modalRefreshRaf = requestAnimationFrame(function(){
+    _modalRefreshRaf = 0;
+    refreshModalStage();
+  });
+}
+
 function refreshModalStage(){
+  if(_modalRefreshRaf){ cancelAnimationFrame(_modalRefreshRaf); _modalRefreshRaf = 0; }
   if(!_modalCtx) return;
   pushUndoCheckpoint();
   updateProductToolsUI(_modalCtx.slot);
@@ -1581,8 +1666,10 @@ function closeModal(){
   closeLibraryDrawer();
   var el = document.getElementById('modal-overlay');
   if(el) el.remove();
+  var editedBanner = _modalCtx ? _modalCtx.banner : null; // 放大編輯只會改到這一組
   _modalCtx = null;
-  renderAll();
+  if(_modalRefreshRaf){ cancelAnimationFrame(_modalRefreshRaf); _modalRefreshRaf = 0; }
+  if(editedBanner) renderBanners([editedBanner]); else renderAll();
 }
 
 /* ══════════════════ 右側常駐「提示與警示」面板 ══════════════════
@@ -1782,7 +1869,11 @@ function deselectAllSlotsExcept(targetSlot){
   STATE.banners.forEach(function(banner){
     Core.SLOT_KEYS.forEach(function(key){
       var slot = banner[key];
-      if(slot !== targetSlot){ slot.__pmSelected = false; slot.__lmSelected = false; }
+      if(slot !== targetSlot){
+        // 原本有選取框的那一組記下來，下次renderBanners()要一起重畫才會把框收掉
+        if((slot.__pmSelected || slot.__lmSelected) && _staleSelectionBanners.indexOf(banner) < 0) _staleSelectionBanners.push(banner);
+        slot.__pmSelected = false; slot.__lmSelected = false;
+      }
     });
   });
 }
@@ -1794,16 +1885,17 @@ function initGlobalDeselect(){
     // 點色盤要選色時，這裡的renderAll()會把色盤所在的input元素整個砍掉
     // 重建，瀏覽器原生色盤的錨點消失就會自動關閉，變成「一點下去就關掉」。
     if(e.target && e.target.closest && e.target.closest('.product-zone, .logo-zone, input, select, button, .swatch')) return;
-    var changed = false;
+    var changed = [];
     STATE.banners.forEach(function(banner){
       Core.SLOT_KEYS.forEach(function(key){
         var slot = banner[key];
         if(slot.__pmSelected || slot.__lmSelected){
-          slot.__pmSelected = false; slot.__lmSelected = false; changed = true;
+          slot.__pmSelected = false; slot.__lmSelected = false;
+          if(changed.indexOf(banner) < 0) changed.push(banner);
         }
       });
     });
-    if(changed) renderAll();
+    if(changed.length) renderBanners(changed); // 只重畫原本有選取框的那幾組
   });
 }
 

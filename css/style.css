@@ -212,6 +212,21 @@ body{ font-family:"ShopeeNoto","Noto Sans TC","Microsoft JhengHei",sans-serif; b
 .popup-body{ padding:16px; }
 .popup-foot{ display:flex; justify-content:flex-end; gap:8px; padding:12px 16px; border-top:1px solid var(--border); }
 
+/* 匯入中的進度視窗（見editor-popups.js的ImportProgress）：轉圈圖示＋一行字＋
+   進度條，讓人看得出來「還在跑、跑到哪了」。 */
+.import-progress .popup-body{ padding:22px 20px; }
+.import-progress-head{ display:flex; align-items:center; gap:10px; font-size:14px; font-weight:700; color:var(--text); }
+#imp-count{ margin-left:auto; font-variant-numeric:tabular-nums; }
+.import-spinner{ width:16px; height:16px; flex:none; border-radius:50%;
+  border:2px solid rgba(255,255,255,0.18); border-top-color:var(--accent);
+  animation:import-spin 0.8s linear infinite; }
+@keyframes import-spin{ to{ transform:rotate(360deg); } }
+.import-progress-bar{ margin-top:14px; height:6px; border-radius:3px; background:rgba(255,255,255,0.1); overflow:hidden; }
+.import-progress-bar > div{ height:100%; width:0; border-radius:3px; background:var(--accent); transition:width 0.2s ease; }
+.import-progress-bar > div.indeterminate{ width:35%; animation:import-slide 1.2s ease-in-out infinite; }
+@keyframes import-slide{ 0%{ margin-left:-35%; } 100%{ margin-left:100%; } }
+.import-progress-slow{ margin-top:16px; }
+
 .dropzone{ border:2px dashed var(--border); border-radius:10px; padding:24px 20px; text-align:center;
   color:var(--text-dim); font-size:13px; transition:border-color .2s, background .2s; cursor:pointer; }
 .dropzone-active{ border-color:var(--accent); background:rgba(238,77,45,0.06); color:var(--text); }

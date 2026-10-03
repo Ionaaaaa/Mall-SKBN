@@ -67,7 +67,12 @@ var Assets = {
       var f = inp.files[0];
       if(!f) return;
       var reader = new FileReader();
-      reader.onload = function(){ cb(reader.result); };
+      // 2026-10：太大的圖先縮小再用（見js/image-shrink.js），不然幾千px的原圖
+      // 整張存進slot，之後每次重畫都很重。
+      reader.onload = function(){
+        if(typeof ImageShrink !== 'undefined') ImageShrink.shrinkDataUrl(reader.result, cb);
+        else cb(reader.result);
+      };
       reader.readAsDataURL(f);
     };
     inp.click();

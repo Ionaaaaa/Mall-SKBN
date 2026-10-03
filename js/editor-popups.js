@@ -116,37 +116,146 @@ function openImportModal(){
     if(!_importState.excelFile){ alert('請先選擇工單 Excel 檔案。'); return; }
     btn.disabled = true;
 
-    createOverlay(
-      '<div class="popup-panel" style="width:320px;">'+
-        '<div class="popup-body" style="text-align:center;padding:32px 16px;">'+
-          '<div class="hint" style="margin:0;">匯入中，請稍候…</div>'+
-        '</div>'+
-      '</div>'
-    );
+    ImportProgress.open();
     runImportFlow(_importState.excelFile, _importState.folderFiles, _importState.zipFile);
   };
 }
 
+/* ══════════════════ 匯入中的進度視窗 ══════════════════
+   2026-10：原本只有一行不會動的「匯入中，請稍候…」，素材資料夾放在雲端硬碟
+   (G:)、檔案大或網路慢的時候會停很久，看不出來是還在跑還是卡死了。改成：
+     - 轉圈圖示＋進度條，畫面一直有在動
+     - 一行字顯示現在跑到哪一步、跑到第幾個（例如「讀取素材　5 / 20」）
+     - 一段時間沒有進展，出現「不等了」的按鈕，不會整個卡住沒有出口
+   畫面上只留這一行字跟按鈕，沒有其他說明小字（你覺得字太多，已拿掉
+   已經過幾秒、MB數、還在讀哪一張、以及卡住時的說明段落）。
+   沿用createOverlay/closePopup：closePopup()把overlay拿掉之後，這裡的計時器
+   發現畫面元素不見了會自己停掉，其他地方不用另外呼叫stop。 */
+var ImportProgress = (function(){
+  var timer = null, lastProgressAt = 0, lastKey = '';
+  var slowAfterMs = 8000, slowBtnText = '', onSlowAction = null;
+
+  function $(id){ return document.getElementById(id); }
+
+  function open(){
+    createOverlay(
+      '<div class="popup-panel import-progress" style="width:380px;">'+
+        '<div class="popup-body">'+
+          '<div class="import-progress-head"><span class="import-spinner"></span><span id="imp-stage">準備中…</span><span id="imp-count"></span></div>'+
+          '<div class="import-progress-bar"><div id="imp-bar"></div></div>'+
+          '<div class="import-progress-slow" id="imp-slow" style="display:none;">'+
+            '<button class="tbtn" id="imp-slow-btn"></button>'+
+          '</div>'+
+        '</div>'+
+      '</div>'
+    );
+    lastProgressAt = Date.now();
+    lastKey = '';
+    onSlowAction = null;
+    $('imp-slow-btn').onclick = function(){ if(onSlowAction) onSlowAction(); };
+    if(timer) clearInterval(timer);
+    timer = setInterval(tick, 500);
+  }
+
+  function tick(){
+    var slow = $('imp-slow');
+    if(!slow){ clearInterval(timer); timer = null; return; } // overlay已經被closePopup()關掉
+    if(onSlowAction && Date.now()-lastProgressAt >= slowAfterMs){
+      $('imp-slow-btn').textContent = slowBtnText;
+      slow.style.display = '';
+    }
+  }
+
+  /* 更新畫面。stage：步驟文字；done/total：進度條，以及接在步驟文字後面的
+     「done / total」；progressKey：判斷「有沒有進展」用的值(讀素材時是已讀的
+     位元組數——畫面上不顯示MB，但檔案還在慢慢下載時也算有在動，不該跳出
+     「不等了」)。有進展就重新計時「多久沒動」。 */
+  function set(o){
+    if(!$('imp-stage')) return;
+    $('imp-stage').textContent = o.stage;
+    var ratio = (o.ratio != null) ? o.ratio : (o.total ? o.done/o.total : 0);
+    var bar = $('imp-bar');
+    if(o.indeterminate){ bar.className = 'indeterminate'; bar.style.width = ''; }
+    else { bar.className = ''; bar.style.width = Math.max(0, Math.min(100, ratio*100)).toFixed(1)+'%'; }
+    $('imp-count').textContent = o.total ? (o.done+' / '+o.total) : '';
+    var key = o.stage+'|'+(o.progressKey != null ? o.progressKey : '')+'|'+o.done+'|'+o.total;
+    if(key !== lastKey){
+      lastKey = key;
+      lastProgressAt = Date.now();
+      var slow = $('imp-slow');
+      if(slow) slow.style.display = 'none';
+    }
+  }
+
+  /* 設定「太久沒進展」時要出現的按鈕。action給null代表這個步驟沒有出口
+     可以給(只顯示進度，不出現按鈕)。 */
+  function setSlowAction(afterMs, btnText, action){
+    slowAfterMs = afterMs; slowBtnText = btnText; onSlowAction = action;
+    lastProgressAt = Date.now();
+    var slow = $('imp-slow');
+    if(slow) slow.style.display = 'none';
+  }
+
+  /* 進度視窗現在是不是還開著（使用者可能已經按「先關掉視窗」）。流程跑完要
+     關視窗前先問一下，避免把使用者後來自己開的其他popup關掉。 */
+  function isOpen(){ return !!$('imp-stage'); }
+
+  return { open:open, set:set, setSlowAction:setSlowAction, isOpen:isOpen };
+})();
+
 /* 確認匯入後真正跑的流程：先把素材資料夾/zip讀進 BatchAssets，再解析Excel，
    最後跑 resolveAndApplyBanners() 自動比對，完成後關掉popup、回到主畫面並
-   顯示警示清單（沿用 editor-main.js 既有的 renderAll()/STATE.warnings）。 */
+   顯示警示清單（沿用 editor-main.js 既有的 renderAll()/STATE.warnings）。
+   2026-10：每個步驟都回報進度給ImportProgress；進度視窗改成等「比對素材」
+   也跑完才關（原本是讀完工單就關，比對在背景跑、畫面上的圖一格一格冒出來）。*/
 function runImportFlow(excelFile, folderFiles, zipFile){
-  var loadBatch = zipFile ? BatchAssets.loadZip(zipFile)
-    : (folderFiles && folderFiles.length ? BatchAssets.loadFileList(folderFiles) : Promise.resolve([]));
+  var hasFolder = !!(folderFiles && folderFiles.length);
+
+  function onBatchProgress(p){
+    ImportProgress.set({
+      stage: '讀取素材',
+      done: p.done, total: p.total,
+      ratio: p.totalBytes ? p.loadedBytes/p.totalBytes : (p.total ? p.done/p.total : 1),
+      progressKey: p.loadedBytes
+    });
+  }
+
+  var loadBatch;
+  if(zipFile){
+    ImportProgress.set({ stage:'解壓縮素材', indeterminate:true, done:0, total:0 });
+    ImportProgress.setSlowAction(8000, '', null);
+    loadBatch = BatchAssets.loadZip(zipFile, function(p){
+      ImportProgress.set({ stage:'解壓縮素材', done:p.done, total:p.total });
+    });
+  } else if(hasFolder){
+    // 8秒沒有任何進展(連位元組都沒在動)才出現按鈕。按了會放棄還沒讀完的
+    // 檔案、用已讀完的繼續；沒讀到的格子會列在警示裡，之後手動補圖。
+    ImportProgress.setSlowAction(8000, '不等了，先用已讀完的素材匯入', function(){ BatchAssets.finishNow(); });
+    loadBatch = BatchAssets.loadFileList(folderFiles, onBatchProgress);
+  } else {
+    loadBatch = Promise.resolve([]);
+  }
 
   loadBatch.catch(function(err){
     console.error(err);
     alert('素材資料夾/zip讀取失敗，先略過素材比對，只匯入Excel文字內容。');
     return [];
   }).then(function(){
+    ImportProgress.setSlowAction(8000, '', null);
+    ImportProgress.set({ stage:'讀取工單', indeterminate:true, done:0, total:0 });
     handleExcelFile(excelFile, function(banners){
       STATE.banners = banners;
       STATE.warnings = [];
-      closePopup();
       renderAll();
+      // 比對這一步如果某一格的圖一直載不進來，不要讓進度視窗把畫面擋死：
+      // 一陣子沒進展就給一個「先關掉視窗」的按鈕，比對照樣在背景跑完。
+      ImportProgress.setSlowAction(10000, '先關掉視窗，背景繼續比對', function(){ closePopup(); });
       resolveAndApplyBanners(STATE.banners, function(warnings){
         STATE.warnings = warnings;
+        if(ImportProgress.isOpen()) closePopup();
         renderAll();
+      }, function(done, total){
+        ImportProgress.set({ stage:'比對素材', done:done, total:total });
       });
     }, function(msg){
       closePopup();

@@ -71,9 +71,15 @@ window.ShadowPlugin = (function () {
   }
   function configureZone(topY, bottomY) { opts.topY = topY; opts.bottomY = bottomY; }
 
+  /* 2026-10 效能：這裡原本會把「所有」註冊過的商品輪廓全部重新上色一次。
+     SKBN每一格的陰影色都跟著自己的底色算，product-module.js每次重畫任何一格
+     之前都會呼叫這支——整份工單匯入後有21格商品，等於畫一格就要把21張輪廓
+     （每張都是原圖大小）重新上色，整個主畫面重畫一次要上色四百多張，拖曳、
+     選色、拉陰影滑桿時會卡主要就是卡在這裡。
+     改成只記下顏色，真的要畫某一格的陰影時才幫「那一格」上色(tintProduct
+     會自己判斷顏色有沒有變，沒變就沿用上次的結果，見drawGroundShadow開頭)。 */
   function setShadowColorRGB(rgbStr) {
     shadowRGB = rgbStr; fixedColor = true;
-    Object.keys(products).forEach(function (id) { tintProduct(id); });
   }
   function getShadowColorRGB() { return shadowRGB; }
   function unlockShadowColor() { fixedColor = false; }
@@ -112,9 +118,12 @@ window.ShadowPlugin = (function () {
     ctx.fillRect(0, 0, c.width, c.height);
     return c;
   }
-  function tintProduct(id) {
-    var p = products[id];
+  function tintProduct(id) { tintWhole(products[id]); }
+  /* 把整張(跟原圖一樣大的)輪廓上色。2026-10之後平常已經不走這裡——畫陰影改用
+     tintedAtSize()縮小後再上色，只有要畫的尺寸比輪廓還大時才會用到整張的。 */
+  function tintWhole(p) {
     if (!p || !p.silhouette) return;
+    if (p.tinted && p.tintedRGB === shadowRGB) return; // 顏色沒變，沿用上次上好色的輪廓
     var tinted = document.createElement('canvas');
     tinted.width = p.silhouette.width; tinted.height = p.silhouette.height;
     var tctx = tinted.getContext('2d');
@@ -123,6 +132,47 @@ window.ShadowPlugin = (function () {
     tctx.fillStyle = 'rgb(' + shadowRGB + ')';
     tctx.fillRect(0, 0, tinted.width, tinted.height);
     p.tinted = tinted;
+    p.tintedRGB = shadowRGB;
+  }
+
+  /* 2026-10 效能：畫陰影時是把商品輪廓上好陰影色之後縮小蓋印很多次——主陰影
+     28次、接地陰影3次。原本每次都拿「跟原圖一樣大」的上色輪廓(p.tinted)去縮，
+     而且每換一次顏色就要把整張大圖重新上色。改成：
+       1. 先把黑色輪廓(p.silhouette)縮到「這次要畫的大小」存起來(p.silScaled)。
+          這張跟顏色無關，商品大小沒變就一直沿用，只有縮放商品時才重做。
+       2. 上色改在這張小圖上做(p.tintedScaled)，換底色時只要重新上色這張小的。
+     「先縮小再上色」跟原本「先上色再縮小」畫出來是一樣的——上色只是把不透明
+     的地方換成同一個顏色，透明度不變。
+     要畫的尺寸比輪廓本身還大時(放大沒有意義)，退回用原本整張上色的p.tinted。 */
+  function tintedAtSize(p, w, h) {
+    var tw = Math.max(1, Math.ceil(w)), th = Math.max(1, Math.ceil(h));
+    if (tw >= p.silhouette.width || th >= p.silhouette.height) {
+      tintWhole(p);
+      return p.tinted;
+    }
+    var sc = p.silScaled;
+    if (!(sc && sc.width === tw && sc.height === th)) {
+      sc = document.createElement('canvas');
+      sc.width = tw; sc.height = th;
+      var sctx = sc.getContext('2d');
+      sctx.imageSmoothingEnabled = true;
+      sctx.imageSmoothingQuality = 'high';
+      sctx.drawImage(p.silhouette, 0, 0, tw, th);
+      p.silScaled = sc;
+      p.tintedScaled = null;
+    }
+    var t = p.tintedScaled;
+    if (t && t.width === tw && t.height === th && p.tintedScaledRGB === shadowRGB) return t;
+    t = document.createElement('canvas');
+    t.width = tw; t.height = th;
+    var tctx = t.getContext('2d');
+    tctx.drawImage(sc, 0, 0);
+    tctx.globalCompositeOperation = 'source-in';
+    tctx.fillStyle = 'rgb(' + shadowRGB + ')';
+    tctx.fillRect(0, 0, tw, th);
+    p.tintedScaled = t;
+    p.tintedScaledRGB = shadowRGB;
+    return t;
   }
 
   function detectAlphaTrim(img) {
@@ -171,7 +221,8 @@ window.ShadowPlugin = (function () {
         var silhouette = buildSilhouette(imgEl);
         var trim = detectAlphaTrim(imgEl);
         products[id] = { img: imgEl, silhouette: silhouette, tinted: null, trim: trim, type: type || 'product' };
-        tintProduct(id);
+        // 2026-10：註冊時不再先把整張輪廓上色(每張都跟原圖一樣大，21格就是21張)，
+        // 等真的要畫陰影時再由tintedAtSize()依要畫的大小上色。
         resolve(products[id]);
       }
       if (imgEl.complete && imgEl.naturalWidth) build();
@@ -247,7 +298,7 @@ window.ShadowPlugin = (function () {
   // ---- 商品：貼地陰影（原本效果，參數已固定） ----
   function drawGroundShadow(ctx, id, state, occluderMask, skipPhoto) {
     var p = products[id];
-    if (!p || !p.tinted) return;
+    if (!p || !p.silhouette) return;
 
     var pw = state.w, ph = state.h;
     var cx = state.x;
@@ -328,39 +379,66 @@ window.ShadowPlugin = (function () {
       var trueGroundY = (state.groundAnchorY != null) ? state.groundAnchorY : (py - trimBottomPad);
       var bw = Math.ceil(pw) + 2, bh = Math.ceil(upPx + downPx) + 2;
       var imgYInTemp = trimBottomPad - ph + upPx; // p.tinted畫在temp canvas裡的y位置，讓輪廓真正的接地邊緣對齊temp的第upPx列
+      /* 2026-10 效能：接地陰影這一小條分兩層快取。
+         1. 形狀(contactMask)：剪裁+挖空+橫向模糊做出來的那一條，只跟商品大小
+            有關，跟顏色、位置都無關。直接用黑色輪廓(p.silhouette，跟原圖一樣大，
+            縮圖方式跟改版前完全相同)去做，商品大小沒變就一直沿用。
+         2. 上色(contactCache)：把形狀整條換成陰影色。這一段全程只有單一顏色，
+            「先做形狀再上色」跟原本「先上色再做形狀」結果一樣；換底色時只要
+            重做這一步(一次填色)，不用重新剪裁+模糊。
+         拖曳移動、拉陰影滑桿時兩層都沿用，只是貼到新位置。 */
+      var maskKey = pw + '|' + ph;
+      var contactMask = (p.contactMask && p.contactMask.key === maskKey) ? p.contactMask.canvas : null;
+      if (!contactMask) {
+        var contactSil = p.silhouette;
 
-      // 往上那一半：商品自己的輪廓，剪裁只留最下面upPx那一條
-      var aboveCanvas = document.createElement('canvas');
-      aboveCanvas.width = bw; aboveCanvas.height = bh;
-      var actx = aboveCanvas.getContext('2d');
-      if (upPx > 0) {
-        actx.save();
-        actx.beginPath();
-        actx.rect(0, 0, bw, upPx);
-        actx.clip();
-        actx.drawImage(p.tinted, 0, imgYInTemp, pw, ph);
-        actx.restore();
+        // 往上那一半：商品自己的輪廓，剪裁只留最下面upPx那一條
+        var aboveCanvas = document.createElement('canvas');
+        aboveCanvas.width = bw; aboveCanvas.height = bh;
+        var actx = aboveCanvas.getContext('2d');
+        if (upPx > 0) {
+          actx.save();
+          actx.beginPath();
+          actx.rect(0, 0, bw, upPx);
+          actx.clip();
+          actx.drawImage(contactSil, 0, imgYInTemp, pw, ph);
+          actx.restore();
+        }
+
+        // 往下那一半：原本「位移+挖空」技巧，貼合輪廓、不是死板矩形
+        var belowCanvas = document.createElement('canvas');
+        belowCanvas.width = bw; belowCanvas.height = bh;
+        var bctx2 = belowCanvas.getContext('2d');
+        if (downPx > 0) {
+          bctx2.globalCompositeOperation = 'source-over';
+          bctx2.drawImage(contactSil, 0, imgYInTemp + downPx, pw, ph);
+          bctx2.globalCompositeOperation = 'destination-out';
+          bctx2.drawImage(contactSil, 0, imgYInTemp, pw, ph);
+          bctx2.globalCompositeOperation = 'source-over';
+        }
+
+        var combinedContact = document.createElement('canvas');
+        combinedContact.width = bw; combinedContact.height = bh;
+        var comCtx = combinedContact.getContext('2d');
+        comCtx.drawImage(aboveCanvas, 0, 0);
+        comCtx.drawImage(belowCanvas, 0, 0);
+
+        contactMask = blurHorizontalOnly(combinedContact, FIXED.contactBlurXPct / 100 * pw);
+        p.contactMask = { key: maskKey, canvas: contactMask };
+        p.contactCache = null;
       }
-
-      // 往下那一半：原本「位移+挖空」技巧，貼合輪廓、不是死板矩形
-      var belowCanvas = document.createElement('canvas');
-      belowCanvas.width = bw; belowCanvas.height = bh;
-      var bctx2 = belowCanvas.getContext('2d');
-      if (downPx > 0) {
-        bctx2.globalCompositeOperation = 'source-over';
-        bctx2.drawImage(p.tinted, 0, imgYInTemp + downPx, pw, ph);
-        bctx2.globalCompositeOperation = 'destination-out';
-        bctx2.drawImage(p.tinted, 0, imgYInTemp, pw, ph);
-        bctx2.globalCompositeOperation = 'source-over';
+      var contactKey = maskKey + '|' + shadowRGB;
+      var combinedBlurred = (p.contactCache && p.contactCache.key === contactKey) ? p.contactCache.canvas : null;
+      if (!combinedBlurred) {
+        combinedBlurred = document.createElement('canvas');
+        combinedBlurred.width = contactMask.width; combinedBlurred.height = contactMask.height;
+        var cbctx = combinedBlurred.getContext('2d');
+        cbctx.drawImage(contactMask, 0, 0);
+        cbctx.globalCompositeOperation = 'source-in';
+        cbctx.fillStyle = 'rgb(' + shadowRGB + ')';
+        cbctx.fillRect(0, 0, combinedBlurred.width, combinedBlurred.height);
+        p.contactCache = { key: contactKey, canvas: combinedBlurred };
       }
-
-      var combinedContact = document.createElement('canvas');
-      combinedContact.width = bw; combinedContact.height = bh;
-      var comCtx = combinedContact.getContext('2d');
-      comCtx.drawImage(aboveCanvas, 0, 0);
-      comCtx.drawImage(belowCanvas, 0, 0);
-
-      var combinedBlurred = blurHorizontalOnly(combinedContact, FIXED.contactBlurXPct / 100 * pw);
       ctx.save();
       ctx.globalCompositeOperation = 'multiply';
       ctx.globalAlpha = FIXED.contactAlpha;
@@ -390,13 +468,23 @@ window.ShadowPlugin = (function () {
       var anchorX = halfW;
       var anchorY = Math.ceil(tempH * 0.5);
 
-      var tmp = document.createElement('canvas');
+      /* 2026-10 效能：主陰影這張圖(蓋印28次+尾端模糊+淡出)長什麼樣子，只跟
+         商品大小、光源角度、陰影顏色有關，跟畫在哪個位置無關。拖曳移動商品、
+         拉「陰影左右/上下位移」滑桿都只是換位置——這幾樣沒變就直接沿用上次
+         算好的那張，貼到新位置就好；只有縮放商品、換角度、換底色才需要重算。
+         有開遮擋(occlude，目前是0沒在用)時形狀會跟位置有關，那種情況不快取。 */
+      var mainKey = spw + '|' + sph + '|' + opts.angle + '|' + shadowRGB;
+      var canCacheMain = !(occludeStrength > 0 && occluderMask);
+      var tmp = (canCacheMain && p.mainShadowCache && p.mainShadowCache.key === mainKey) ? p.mainShadowCache.canvas : null;
+      if (!tmp) {
+      tmp = document.createElement('canvas');
       tmp.width = tempW; tmp.height = tempH;
       var tctx = tmp.getContext('2d');
 
-      stampLayer(tctx, p.tinted, anchorX, anchorY, spw, sph, shear, squash, soft * 1.8, 0.28, 12);
-      stampLayer(tctx, p.tinted, anchorX, anchorY, spw, sph, shear, squash, soft * 0.8, 0.4, 10);
-      stampLayer(tctx, p.tinted, anchorX, anchorY, spw, sph, shear, squash, soft * 0.25, 0.35, 6);
+      var stampTint = tintedAtSize(p, spw, sph); // 2026-10：先縮到要畫的大小再蓋印，見tintedAtSize
+      stampLayer(tctx, stampTint, anchorX, anchorY, spw, sph, shear, squash, soft * 1.8, 0.28, 12);
+      stampLayer(tctx, stampTint, anchorX, anchorY, spw, sph, shear, squash, soft * 0.8, 0.4, 10);
+      stampLayer(tctx, stampTint, anchorX, anchorY, spw, sph, shear, squash, soft * 0.25, 0.35, 6);
 
       if (occludeStrength > 0 && occluderMask) {
         tctx.save();
@@ -469,6 +557,8 @@ window.ShadowPlugin = (function () {
       tctx.fillStyle = grad;
       tctx.fillRect(0, 0, tempW, tempH);
       tctx.globalCompositeOperation = 'source-over';
+      if (canCacheMain) p.mainShadowCache = { key: mainKey, canvas: tmp };
+      }
 
       /* 柔化用的「霧化取樣」（stampLayer 裡的 spread 抖動）本來就會讓陰影邊緣稍微
          超出接地線一點點，商品底部以下超過約5px的部分裁掉，避免陰影明顯滲到商品

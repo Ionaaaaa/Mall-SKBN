@@ -159,8 +159,10 @@ function handleExcelFile(file, onSuccess, onFail){
    在 Excel 匯入後、以及每次「這批素材資料夾」重新上傳後都會呼叫一次。
    對還沒解出圖檔來源的欄位重新嘗試比對，已經有來源的（不管是比對到的還是
    使用者事後手動換的）不會被覆蓋。完成後回傳這一輪的警示清單（沒有殘留
-   上一輪已經解決掉的項目）。 */
-function resolveAndApplyBanners(banners, onDone){
+   上一輪已經解決掉的項目）。
+   2026-10：onProgress(done,total)可選，每一格比對/套用完成就回報一次，給
+   匯入中的進度視窗顯示「第幾格/共幾格」用。 */
+function resolveAndApplyBanners(banners, onDone, onProgress){
   var warnings = [];
   var ensureLib = (typeof AssetLibrary !== 'undefined' && !AssetLibrary.isLoaded()) ? AssetLibrary.load() : Promise.resolve();
   ensureLib.then(function(){
@@ -170,6 +172,13 @@ function resolveAndApplyBanners(banners, onDone){
         slotPromises.push(resolveSlot(banner[key], banner, bIdx, key, warnings));
       });
     });
+    var slotDone = 0, slotTotal = slotPromises.length;
+    if(onProgress){
+      try{ onProgress(0, slotTotal); }catch(e){}
+      slotPromises.forEach(function(p){
+        p.then(function(){ slotDone++; try{ onProgress(slotDone, slotTotal); }catch(e){} });
+      });
+    }
     Promise.all(slotPromises).then(function(){ onDone(warnings); });
   });
 }
