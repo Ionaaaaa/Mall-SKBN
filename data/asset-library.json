@@ -57,7 +57,7 @@
           "matchKeys": [
             "3C資訊展"
           ],
-          "_note": "這張圖是純白色(只有透明度沒有顏色資訊)，只有放在深色/有顏色的背景上才看得到——跟festival分類原本的「依背景深淺自動判斷要不要強制白色」邏輯不一樣，這張本來就是白的，背景太淺的話logo會直接消失，需要的話要手動指定背景色。"
+          "_note": "2026-10-05：圖檔換成橘色版(跟其他造節LOGO同一套，518x113)。原本是純白色的檔(766x167)，淺色背景會看不到；換成橘色版之後跟其他造節LOGO一樣，背景偏深才自動強制白色。"
         },
         {
           "id": "underwear-festival_logo",
@@ -296,6 +296,306 @@
           ],
           "keepOriginalColor": true,
           "_note": "這張LOGO是「白底黑字+黑底白字」兩塊拼起來的(白色那塊是實心的，不是透明)，強制白色會變成一整塊白色剪影、字看不到。2026-10：加上keepOriginalColor:true，匯入時固定用原本的樣子，不管背景深淺都不會自動開強制白色。"
+        },
+        {
+          "id": "lifestyle-festival_logo",
+          "brand": "生活風格節",
+          "name": "生活風格節",
+          "type": "logo",
+          "path": "system-elements/festival/lifestyle-festival_logo.png",
+          "matchKeys": [
+            "生活風格節",
+            "生活風格",
+            "風格節"
+          ]
+        },
+        {
+          "id": "good-life-festival_logo",
+          "brand": "美好生活節",
+          "name": "美好生活節",
+          "type": "logo",
+          "path": "system-elements/festival/good-life-festival_logo.png",
+          "matchKeys": [
+            "美好生活節",
+            "美好生活"
+          ]
+        },
+        {
+          "id": "auto-goods-summer-sale_logo",
+          "brand": "車用百貨夏殺",
+          "name": "車用百貨夏殺",
+          "type": "logo",
+          "path": "system-elements/festival/auto-goods-summer-sale_logo.png",
+          "matchKeys": [
+            "車用百貨夏殺",
+            "車用百貨",
+            "車用夏殺",
+            "夏殺"
+          ]
+        },
+        {
+          "id": "good-food-time_logo",
+          "brand": "享樂好食光",
+          "name": "享樂好食光",
+          "type": "logo",
+          "path": "system-elements/festival/good-food-time_logo.png",
+          "matchKeys": [
+            "享樂好食光",
+            "享樂好時光",
+            "好食光",
+            "享樂好食"
+          ]
+        },
+        {
+          "id": "517-foodie-festival_logo",
+          "brand": "517吃貨節",
+          "name": "517吃貨節",
+          "type": "logo",
+          "path": "system-elements/festival/517-foodie-festival_logo.png",
+          "matchKeys": [
+            "517吃貨節",
+            "5.17吃貨節",
+            "5.17",
+            "517吃貨",
+            "吃貨節",
+            "517"
+          ]
+        },
+        {
+          "id": "collectors-realm_logo",
+          "brand": "玩家收藏秘境",
+          "name": "玩家收藏秘境",
+          "type": "logo",
+          "path": "system-elements/festival/collectors-realm_logo.png",
+          "matchKeys": [
+            "玩家收藏秘境",
+            "玩家收藏祕境",
+            "玩家收藏",
+            "收藏秘境",
+            "收藏祕境",
+            "玩家秘境"
+          ]
+        },
+        {
+          "id": "entertainment-book_logo",
+          "brand": "娛樂非你BOOK",
+          "name": "娛樂非你BOOK",
+          "type": "logo",
+          "path": "system-elements/festival/entertainment-book_logo.png",
+          "matchKeys": [
+            "娛樂非你BOOK",
+            "娛樂非你不可",
+            "娛樂非你",
+            "非你BOOK",
+            "娛樂BOOK"
+          ]
+        },
+        {
+          "id": "winter-warm-awards_logo",
+          "brand": "保暖大賞",
+          "name": "保暖大賞",
+          "type": "logo",
+          "path": "system-elements/festival/winter-warm-awards_logo.png",
+          "matchKeys": [
+            "保暖大賞",
+            "保暖大賞節"
+          ]
+        },
+        {
+          "id": "bath-care-carnival_logo",
+          "brand": "洗沐嘉年華",
+          "name": "洗沐嘉年華",
+          "type": "logo",
+          "path": "system-elements/festival/bath-care-carnival_logo.png",
+          "matchKeys": [
+            "洗沐嘉年華",
+            "洗沐嘉年",
+            "洗沐節",
+            "洗沐"
+          ]
+        },
+        {
+          "id": "summer-clearance_logo",
+          "brand": "夏出清",
+          "name": "夏出清",
+          "type": "logo",
+          "path": "system-elements/festival/summer-clearance_logo.png",
+          "matchKeys": [
+            "夏出清",
+            "夏季出清",
+            "夏日出清"
+          ]
+        },
+        {
+          "id": "checkout-cart_logo",
+          "brand": "付清購物車",
+          "name": "付清購物車",
+          "type": "logo",
+          "path": "system-elements/festival/checkout-cart_logo.png",
+          "matchKeys": [
+            "付清購物車",
+            "清空購物車",
+            "付清購物",
+            "付清"
+          ]
+        },
+        {
+          "id": "cool-summer_logo",
+          "brand": "清涼一夏",
+          "name": "清涼一夏",
+          "type": "logo",
+          "path": "system-elements/festival/cool-summer_logo.png",
+          "matchKeys": [
+            "清涼一夏",
+            "清涼一下"
+          ]
+        },
+        {
+          "id": "summer-skin-day_logo",
+          "brand": "盛夏美肌日",
+          "name": "盛夏美肌日",
+          "type": "logo",
+          "path": "system-elements/festival/summer-skin-day_logo.png",
+          "matchKeys": [
+            "盛夏美肌日",
+            "盛夏美肌",
+            "美肌日"
+          ]
+        },
+        {
+          "id": "beauty-holics_logo",
+          "brand": "超狂美妝節",
+          "name": "超狂美妝節",
+          "type": "logo",
+          "path": "system-elements/festival/beauty-holics_logo.png",
+          "matchKeys": [
+            "超狂美妝節",
+            "超狂美妝",
+            "美妝節",
+            "Beauty Holics"
+          ]
+        },
+        {
+          "id": "golden-day_logo",
+          "brand": "Golden Day",
+          "name": "Golden Day",
+          "type": "logo",
+          "path": "system-elements/festival/golden-day_logo.png",
+          "matchKeys": [
+            "Golden Day",
+            "GoldenDay",
+            "黃金雨"
+          ]
+        },
+        {
+          "id": "thanksgiving-clearance_logo",
+          "brand": "感恩出清",
+          "name": "感恩出清",
+          "type": "logo",
+          "path": "system-elements/festival/thanksgiving-clearance_logo.png",
+          "matchKeys": [
+            "感恩出清",
+            "感恩節出清"
+          ]
+        },
+        {
+          "id": "thanks-shoes_logo",
+          "brand": "感鞋有你",
+          "name": "感鞋有你",
+          "type": "logo",
+          "path": "system-elements/festival/thanks-shoes_logo.png",
+          "matchKeys": [
+            "感鞋有你",
+            "感謝有你",
+            "感鞋"
+          ]
+        },
+        {
+          "id": "christmas-gifting_logo",
+          "brand": "聖誕送禮季",
+          "name": "聖誕送禮季",
+          "type": "logo",
+          "path": "system-elements/festival/christmas-gifting_logo.png",
+          "matchKeys": [
+            "聖誕送禮季",
+            "聖誕送禮",
+            "聖誕禮物季",
+            "聖誕"
+          ]
+        },
+        {
+          "id": "sports-brand-clearance_logo",
+          "brand": "運動大牌出清",
+          "name": "運動大牌出清",
+          "type": "logo",
+          "path": "system-elements/festival/sports-brand-clearance_logo.png",
+          "matchKeys": [
+            "運動大牌出清",
+            "運動大牌",
+            "運動出清"
+          ]
+        },
+        {
+          "id": "shopee-ghost-festival_logo",
+          "brand": "蝦皮中元節",
+          "name": "蝦皮中元節",
+          "type": "logo",
+          "path": "system-elements/festival/shopee-ghost-festival_logo.png",
+          "matchKeys": [
+            "蝦皮中元節",
+            "中元節",
+            "中元"
+          ]
+        },
+        {
+          "id": "shopee-mid-autumn-festival_logo",
+          "brand": "蝦皮中秋節",
+          "name": "蝦皮中秋節",
+          "type": "logo",
+          "path": "system-elements/festival/shopee-mid-autumn-festival_logo.png",
+          "matchKeys": [
+            "蝦皮中秋節",
+            "中秋節",
+            "中秋"
+          ]
+        },
+        {
+          "id": "shopee-sports-day_logo",
+          "brand": "蝦蝦運動會",
+          "name": "蝦蝦運動會",
+          "type": "logo",
+          "path": "system-elements/festival/shopee-sports-day_logo.png",
+          "matchKeys": [
+            "蝦蝦運動會",
+            "蝦蝦運動",
+            "運動會"
+          ]
+        },
+        {
+          "id": "mothers-day-party_logo",
+          "brand": "禮享母親派對",
+          "name": "禮享母親派對",
+          "type": "logo",
+          "path": "system-elements/festival/mothers-day-party_logo.png",
+          "matchKeys": [
+            "禮享母親派對",
+            "禮享母親",
+            "母親派對",
+            "母親節派對",
+            "母親節"
+          ]
+        },
+        {
+          "id": "shopee-medical-beauty-festival_logo",
+          "brand": "蝦皮醫美節",
+          "name": "蝦皮醫美節",
+          "type": "logo",
+          "path": "system-elements/festival/shopee-medical-beauty-festival_logo.png",
+          "matchKeys": [
+            "蝦皮醫美節",
+            "醫美節",
+            "醫美"
+          ]
         }
       ]
     },
@@ -549,6 +849,23 @@
           "_note": "這張跟上面「蝦皮直營 LOGO」是不同檔——這張下面多印了「3C家電」一行副標，只適合3C家電類的檔期。2026-10：比對規則已改成「符合的字最長的那一筆優先」(見js/asset-matcher.js的bestLogoMatch)，工單寫「蝦皮直營3C家電」會比對到這筆，只寫「蝦皮直營」才會比對到上面那筆單純版，不會再互搶。"
         },
         {
+          "id": "shopee-official-store-supermarket_logo",
+          "brand": "蝦皮直營生活超市",
+          "name": "蝦皮直營 生活超市",
+          "type": "logo",
+          "path": "system-elements/common/shopee-official-store-supermarket_logo.jpg",
+          "matchKeys": [
+            "蝦皮直營生活超市",
+            "蝦皮直營 生活超市",
+            "蝦皮直營+生活超市",
+            "蝦皮直營_生活超市",
+            "蝦皮直營-生活超市",
+            "生活超市"
+          ],
+          "keepOriginalColor": true,
+          "_note": "2026-10：目前用的是紅底的JPG(300x300，沒有去背)，Iona說先用這張。加上keepOriginalColor:true——遇到深色背景也不自動開強制白色(沒有透明資訊，強制白色會變成一整塊白色方塊)。之後拿到去背版再換檔。工單寫「蝦皮直營生活超市」會比對到這筆(符合的字最長優先)，只寫「蝦皮直營」還是比對到單純版。"
+        },
+        {
           "id": "brand-member_logo",
           "brand": "品牌會員",
           "name": "品牌會員",
@@ -623,6 +940,44 @@
             "Apple經銷"
           ],
           "_note": "這張圖是純白色(只有透明度沒有顏色資訊)，只有放在深色/有顏色的背景上才看得到，背景太淺的話logo會直接消失，需要的話要手動指定背景色。"
+        },
+        {
+          "id": "lux-fashion_logo",
+          "brand": "Lux輕奢時尚",
+          "name": "Lux 輕奢時尚",
+          "type": "logo",
+          "path": "system-elements/common/lux-fashion_logo.png",
+          "matchKeys": [
+            "Lux輕奢時尚",
+            "Lux 輕奢時尚",
+            "輕奢時尚",
+            "輕奢"
+          ]
+        },
+        {
+          "id": "shopee-bookstore_logo",
+          "brand": "蝦皮書城",
+          "name": "蝦皮書城",
+          "type": "logo",
+          "path": "system-elements/common/shopee-bookstore_logo.png",
+          "matchKeys": [
+            "蝦皮書城",
+            "書城"
+          ]
+        },
+        {
+          "id": "payday5-restock_logo",
+          "brand": "5號發薪補貨日",
+          "name": "5號發薪補貨日",
+          "type": "logo",
+          "path": "system-elements/common/payday5-restock_logo.png",
+          "matchKeys": [
+            "5號發薪補貨日",
+            "發薪補貨日",
+            "發薪補貨",
+            "5號發薪",
+            "發薪日"
+          ]
         }
       ]
     }
