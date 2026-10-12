@@ -441,14 +441,19 @@ window.Modules.product = {
       if(shadowOn() && registeredId){
         Modules.product._applyShadowColorFromBg(slot);
         ShadowPlugin.setAngle(slot.shadowAngle);
-        var shx = fit.x + (slot.shadowOffsetX||0)*boxW;
+        /* 2026-10修正：ShadowPlugin的x要的是「整張PNG(含透明留白)」的中心，
+           不是有色範圍中心(fit.x)。之前直接傳fit.x，PNG左右留白不對稱的商品
+           (例如植村秀：左留白36%、右10.7%)接地陰影會整條往一邊偏，主斜切陰影
+           又被plugin內部trim修正再補一次，偏兩倍。y不用改，兩邊都是吃有色底邊。 */
+        var shadowCx = fit.drawX + fit.drawW/2;
+        var shx = shadowCx + (slot.shadowOffsetX||0)*boxW;
         var shy = fit.groundY + (slot.shadowOffsetY||0)*boxH;
         /* 2026-09跟你確認：接地陰影(商品腳下那條)不能跟著「陰影左右/上下位移」
            滑桿一起跑，只有主陰影/中角度柔霧可以被這兩個滑桿挪動。這裡額外多帶
            groundAnchorX/Y(商品沒加位移的原始接地位置)給shadow-plugin.js，
            它會專門拿這組值去算接地陰影的位置，x/y(shx/shy，已經加了位移)還是
            照舊給主陰影/柔霧用。 */
-        ShadowPlugin.renderScene(ctx, [{ id:registeredId, x:shx, y:shy, w:fit.w, h:fit.h, groundAnchorX: fit.x, groundAnchorY: fit.groundY, refW: fit.refW, refH: fit.refH }], true);
+        ShadowPlugin.renderScene(ctx, [{ id:registeredId, x:shx, y:shy, w:fit.w, h:fit.h, groundAnchorX: shadowCx, groundAnchorY: fit.groundY, refW: fit.refW, refH: fit.refH }], true);
       }
 
       // 商品照片＋券樣文字：繞著選取框中心旋轉（陰影不轉，維持貼地）
@@ -657,7 +662,8 @@ window.Modules.product = {
       ShadowPlugin.registerProduct(id, img, 'product').then(function(){
         var trim = (ShadowPlugin._products[id]||{}).trim;
         var fit = Modules.product._computeFit(img, z.w, z.h, slot, trim);
-        var absAnchorX = lx+fit.x, absAnchorY = ly+fit.groundY;
+        // 2026-10修正：x傳整張PNG中心(不是有色範圍中心fit.x)，理由同redraw()那邊
+        var absAnchorX = lx+fit.drawX+fit.drawW/2, absAnchorY = ly+fit.groundY;
 
         if(slot.shadowAngle && slot.shadowAngle !== 'off'){
           Modules.product._applyShadowColorFromBg(slot);
