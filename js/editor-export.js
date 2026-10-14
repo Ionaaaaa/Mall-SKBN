@@ -88,8 +88,10 @@ function exportFolderName(banners){
    工單的暫存欄位)，不是使用者資料，而且有些(HTMLImageElement)根本無法存成
    JSON。唯一例外是LOGO的內容框偵測結果(__logoContentW/H、__trimInitFor)：
    載入後如果這三個是空的，logo-module會重新偵測並把使用者調整過的LOGO位置/
-   縮放蓋掉(見logo-module.js的_detectLogoContent)，所以要一起存起來。 */
-var DRAFT_KEEP_KEYS = { '__logoContentW':1, '__logoContentH':1, '__trimInitFor':1 };
+   縮放蓋掉(見logo-module.js的_detectLogoContent)，所以要一起存起來。
+   2026-10新增__logoContentCx/Cy(有色範圍中心)：掛標關閉時LOGO「鎖在框內」
+   要用到，沒存的話讀回草稿會當作置中，偏一邊的LOGO會鎖得不準。 */
+var DRAFT_KEEP_KEYS = { '__logoContentW':1, '__logoContentH':1, '__logoContentCx':1, '__logoContentCy':1, '__trimInitFor':1 };
 
 function serializeDraft(banners){
   return JSON.stringify({

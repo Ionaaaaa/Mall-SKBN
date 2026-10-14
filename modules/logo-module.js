@@ -36,8 +36,20 @@ window.Modules.logo = {
       var side = Math.min(z.w, z.h);
       return { x: z.x + (z.w-side)/2, y: z.y + (z.h-side)/2, w: side, h: side };
     }
+    /* 2026-10跟你確認：掛標關掉、LOGO置中時，「沒有包底色」的模式(original/
+       fill)，LOGO的「可見範圍(不會被裁掉的區域)」左右放寬到卡片寬度的
+       TAGOFF_WIDE_RATIO(80%)，高度不變，一樣以卡片置中；但「預設大小」還是
+       照原本logoZone的寬度(fitW)去算，所以預設畫出來跟以前一樣大——只有極少數
+       長形LOGO需要再放大時，使用者自己拉大，左右不會再被188寬的遮罩切掉。
+       trim模式(白色膠囊)維持原本188寬的膠囊不動，不受影響。 */
+    if(cfg.tagZone && slot.tagVariant === 'off' && slot.logoMode !== 'trim'){
+      var card = cfg.blockRect || z;
+      var wideW = Math.max(z.w, card.w * Modules.logo.TAGOFF_WIDE_RATIO);
+      return { x: card.x + (card.w-wideW)/2, y: z.y, w: wideW, h: z.h, fitW: z.w };
+    }
     return z;
   },
+  TAGOFF_WIDE_RATIO: 0.8,
 
   /* 掛標關閉時（slot.tagVariant==='off'，見editor-import.js的Excel「無」判斷
      或使用者手動關掉），LOGO維持原本logoZone的寬高不變，水平移動去置中
@@ -74,14 +86,51 @@ window.Modules.logo = {
 
   /* 算出LOGO原圖在zone本地座標系(0,0=zone左上角)裡的實際繪製矩形，疊上
      logoScale倍率跟logoOffsetX/Y位移。 */
-  _computeLogoFit: function(img, zoneW, zoneH, slot){
+  /* fitWRatio(選填，預設1)：預設大小用的寬度佔zoneW的比例——掛標關閉、可見
+     範圍放寬時(見effectiveZone的fitW)，預設縮放仍照原本logoZone寬度算，
+     zoneW本身(可見範圍/置中/位移基準)則是放寬後的寬度。 */
+  _fitWRatio: function(zone){ return (zone && zone.fitW) ? zone.fitW/zone.w : 1; },
+
+  /* 這個zone要不要「把LOGO有色範圍鎖在框內」：只有掛標關閉放寬範圍(zone.fitW)
+     而且是原圖模式時才鎖——滿版(fill)本來就是cover裁切，trim有自己的膠囊。 */
+  _shouldClamp: function(zone, slot){ return !!(zone && zone.fitW) && (slot.logoMode||'original') === 'original'; },
+
+  _computeLogoFit: function(img, zoneW, zoneH, slot, fitWRatio, clamp){
     var contentW = slot.__logoContentW || img.width;
     var contentH = slot.__logoContentH || img.height;
-    var baseScale = Modules.logo._baseScaleForMode(slot.logoMode, zoneW, zoneH, contentW, contentH);
+    var baseScale = Modules.logo._baseScaleForMode(slot.logoMode, zoneW*(fitWRatio||1), zoneH, contentW, contentH);
+
+    /* 2026-10跟你確認：掛標關閉、沒底色(原圖模式)時，LOGO的「有色範圍」
+       (偵測到的內容框，不含透明留白)不能超出外框——拉大最多拉到有色範圍
+       碰到外框的左右或上下為止，拖曳也只能拖到有色範圍貼齊外框邊緣。
+       超出時直接把slot.logoScale/logoOffsetX/Y寫回夾住後的值，這樣拖過頭
+       再往回拖時不會有一段「拖了沒反應」的空檔。 */
+    if(clamp){
+      var maxUserScale = Math.min(zoneW/(contentW*baseScale), zoneH/(contentH*baseScale));
+      if((slot.logoScale||1) > maxUserScale) slot.logoScale = maxUserScale;
+    }
+
     var scale = baseScale * (slot.logoScale || 1);
     var drawW = img.width*scale, drawH = img.height*scale;
     var centerX = zoneW/2 + (slot.logoOffsetX||0)*zoneW;
     var centerY = zoneH/2 + (slot.logoOffsetY||0)*zoneH;
+
+    if(clamp){
+      // 有色範圍中心在原圖裡的位置(舊草稿沒有存這兩個值時，當作置中)
+      var ccx = (slot.__logoContentCx != null) ? slot.__logoContentCx : img.width/2;
+      var ccy = (slot.__logoContentCy != null) ? slot.__logoContentCy : img.height/2;
+      var cw = contentW*scale, ch = contentH*scale;
+      // 有色範圍中心在zone裡的座標 = 整張圖中心 + (內容中心-圖中心)*scale
+      var dxC = (ccx - img.width/2)*scale, dyC = (ccy - img.height/2)*scale;
+      var cX = centerX + dxC, cY = centerY + dyC;
+      var cX2 = Math.max(cw/2, Math.min(zoneW - cw/2, cX));
+      var cY2 = Math.max(ch/2, Math.min(zoneH - ch/2, cY));
+      if(cX2 !== cX || cY2 !== cY){
+        centerX = cX2 - dxC; centerY = cY2 - dyC;
+        slot.logoOffsetX = (centerX - zoneW/2)/zoneW;
+        slot.logoOffsetY = (centerY - zoneH/2)/zoneH;
+      }
+    }
     return { drawX: centerX-drawW/2, drawY: centerY-drawH/2, drawW:drawW, drawH:drawH, centerX:centerX, centerY:centerY };
   },
 
@@ -92,7 +141,7 @@ window.Modules.logo = {
      （slot.__trimInitFor記錄目前這份計算結果是對應哪個logoRaw，換圖或
      還沒算過才重算），算完之後使用者自己調整logoScale/Offset就不會再被
      蓋掉。 */
-  _detectLogoContent: function(slot, zoneW, zoneH, cb){
+  _detectLogoContent: function(slot, zoneW, zoneH, cb, fitWRatio){
     if(slot.__trimInitFor === slot.logoRaw && slot.__logoContentW){ cb(); return; }
     var img = new Image();
     img.crossOrigin = 'anonymous';
@@ -138,10 +187,13 @@ window.Modules.logo = {
         // 視窗才會維持同樣的比例。
         slot.__logoContentW = contentW;
         slot.__logoContentH = contentH;
+        // 有色範圍中心(原圖座標)，給_computeLogoFit「鎖在框內」用
+        slot.__logoContentCx = contentCx;
+        slot.__logoContentCy = contentCy;
         // 用「當下這個模式」的基準縮放去算初始置中位移，跟_computeLogoFit
         // 實際渲染時用同一套算法(_baseScaleForMode)，才不會算出來的置中
         // 位移跟畫面上真正用的縮放對不起來。
-        var fitScale = Modules.logo._baseScaleForMode(slot.logoMode, zoneW, zoneH, contentW, contentH);
+        var fitScale = Modules.logo._baseScaleForMode(slot.logoMode, zoneW*(fitWRatio||1), zoneH, contentW, contentH);
         var contentOffsetFullX = (contentCx - img.naturalWidth/2) * fitScale;
         var contentOffsetFullY = (contentCy - img.naturalHeight/2) * fitScale;
         slot.logoOffsetX = -contentOffsetFullX/zoneW;
@@ -152,6 +204,8 @@ window.Modules.logo = {
         console.warn('[logo-module] 偵測LOGO內容框失敗，改用整張圖預設', e);
         slot.__logoContentW = img.naturalWidth;
         slot.__logoContentH = img.naturalHeight;
+        slot.__logoContentCx = img.naturalWidth/2;
+        slot.__logoContentCy = img.naturalHeight/2;
         slot.__trimInitFor = slot.logoRaw;
       }
       cb();
@@ -203,7 +257,7 @@ window.Modules.logo = {
 
     Modules.logo._detectLogoContent(slot, zone.w, zone.h, function(){
       Modules.logo._buildInteractive(box, slot, zone, scale, onRequestPick, onChange, onSelect, onRequestLibraryPick);
-    });
+    }, Modules.logo._fitWRatio(zone));
   },
 
   _buildInteractive: function(box, slot, zone, scale, onRequestPick, onChange, onSelect, onRequestLibraryPick){
@@ -218,6 +272,8 @@ window.Modules.logo = {
     ctx.scale(dpr, dpr); // 後面所有畫圖座標維持邏輯像素(boxW/boxH)，這行讓它吃滿實際裝置解析度
 
     var img = null, lastFit = null, drag = null;
+    var fitWRatio = Modules.logo._fitWRatio(zone);
+    var clamp = Modules.logo._shouldClamp(zone, slot);
     function selected(){ return !!slot.__lmSelected; }
 
     function redraw(){
@@ -232,14 +288,14 @@ window.Modules.logo = {
         ctx.fill();
         ctx.clip(); // LOGO原圖只會在膠囊範圍內看得到，色塊本身不會被蓋住/改變
         if(img){
-          var fit = Modules.logo._computeLogoFit(img, boxW, boxH, slot);
+          var fit = Modules.logo._computeLogoFit(img, boxW, boxH, slot, fitWRatio);
           lastFit = fit;
           Modules.logo._drawLogoImage(ctx, slot, img, slot.logoRaw, fit.drawX, fit.drawY, fit.drawW, fit.drawH);
         }
         ctx.restore();
       } else {
         if(!img) return;
-        var fit2 = Modules.logo._computeLogoFit(img, boxW, boxH, slot);
+        var fit2 = Modules.logo._computeLogoFit(img, boxW, boxH, slot, fitWRatio, clamp);
         lastFit = fit2;
         ctx.save();
         ctx.beginPath(); ctx.rect(0,0,boxW,boxH); ctx.clip();
@@ -441,7 +497,7 @@ window.Modules.logo = {
         ctx.rect(zx, zy, zone.w, zone.h);
         ctx.clip();
       }
-      var fit = Modules.logo._computeLogoFit(img, zone.w, zone.h, slot);
+      var fit = Modules.logo._computeLogoFit(img, zone.w, zone.h, slot, Modules.logo._fitWRatio(zone), Modules.logo._shouldClamp(zone, slot));
       Modules.logo._drawLogoImage(ctx, slot, img, (slot.logoMode==='trim'?slot.logoRaw:slot.logoSrc), zx+fit.drawX, zy+fit.drawY, fit.drawW, fit.drawH);
       ctx.restore();
       done();
@@ -456,6 +512,6 @@ window.Modules.logo = {
       img.onload = function(){ draw(img); };
       img.onerror = done;
       img.src = (slot.logoMode === 'trim') ? slot.logoRaw : slot.logoSrc;
-    });
+    }, Modules.logo._fitWRatio(zone));
   }
 };
