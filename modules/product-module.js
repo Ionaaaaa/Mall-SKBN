@@ -280,7 +280,77 @@ window.Modules.product = {
     box.className = 'zone-box product-zone';
     Core.applyZoneStyle(box, cfg.artZone, originX, originY, scale);
     el.appendChild(box);
-    Modules.product._buildInteractive(box, slot, cfg, scale, onRequestPick, onChange, onSelect);
+    // 對齊參考線/吸附只在放大編輯視窗啟用(跟你確認過)：core.js的buildBlockStage
+    // 建的卡片容器會帶block-modal這個class，主畫面小格子沒有。
+    var isModal = !!(el.classList && el.classList.contains('block-modal'));
+    Modules.product._buildInteractive(box, slot, cfg, scale, onRequestPick, onChange, onSelect, isModal);
+  },
+
+  /* ── 對齊參考線＋吸附（2026-10，只在放大編輯視窗）──────────────────
+     選取商品後：畫「商品自己的X/Y基準線」——穿過商品有色範圍中心的一直
+     一橫藍色虛線，跟著商品移動；商品中心剛好對到商品區域(artZone)正中間
+     時，那條線變紅色實線(垂直、水平各自判斷)。拖曳移動時，中心靠近正中間
+     GUIDE_SNAP_PX(螢幕px)以內會吸過去；縮放/旋轉/方向鍵/滾輪不吸附。
+     旋轉過的商品，「中心」用實際輪廓旋轉後的範圍來算(見_rotatedBounds)，
+     不是把矩形框轉過去取外框——那樣有斜角/透明區的商品會不準。
+     logo-module.js有同一套顏色/門檻，兩邊要改記得一起改。 */
+  GUIDE_BLUE: '#5ab8ff',
+  GUIDE_RED: '#ff2d2d',
+  GUIDE_SNAP_PX: 6,
+  GUIDE_ALIGN_EPS: 0.5,
+  /* 旋轉吸附(2026-10，放大編輯視窗才有)：拖旋轉把手時，角度靠近45°的倍數
+     (0/±45/±90/±135/180)ROT_SNAP_DEG度以內就吸過去，吸住時選取框變紅。 */
+  ROT_SNAP_DEG: 4,
+  _snapAngle: function(deg){
+    var n = ((deg % 360) + 540) % 360 - 180;          // 換成-180~180
+    var t = Math.round(n/45)*45;
+    if(Math.abs(n - t) <= Modules.product.ROT_SNAP_DEG) return { deg: (t === -180 ? 180 : t), snapped: true };
+    return { deg: deg, snapped: false };
+  },
+
+  /* 商品輪廓點(0~1正規化座標，對應整張原圖含透明留白)，縮小到300px掃一次
+     邊緣像素，快取在img上，換圖才重算。 */
+  _outlinePts: function(img){
+    if(img.__outlinePts) return img.__outlinePts;
+    var pts = [];
+    try{
+      var M = 300, sc = Math.min(1, M/Math.max(img.width, img.height)); // 跟shadow-plugin偵測留白同解析度
+      var w = Math.max(1, Math.round(img.width*sc)), h = Math.max(1, Math.round(img.height*sc));
+      var c = document.createElement('canvas'); c.width = w; c.height = h;
+      var cx = c.getContext('2d'); cx.drawImage(img, 0, 0, w, h);
+      var d = cx.getImageData(0, 0, w, h).data;
+      var A = function(x, y){ return (x<0||y<0||x>=w||y>=h) ? 0 : d[(y*w+x)*4+3]; };
+      for(var y=0;y<h;y++) for(var x=0;x<w;x++){
+        if(A(x,y) > 10 && (A(x-1,y)<=10 || A(x+1,y)<=10 || A(x,y-1)<=10 || A(x,y+1)<=10)){
+          pts.push([x/w, y/h], [(x+1)/w, y/h], [x/w, (y+1)/h], [(x+1)/w, (y+1)/h]);
+        }
+      }
+    }catch(e){ console.warn('[product-module] 掃描商品輪廓失敗，參考線改用矩形框', e); }
+    img.__outlinePts = pts;
+    return pts;
+  },
+
+  /* 商品照目前位置/縮放/旋轉畫出來後，實際輪廓在artZone座標裡的範圍。
+     旋轉樞紐跟redraw()一樣是tight box中心。掃不到輪廓時退回用tight box四角。 */
+  _rotatedBounds: function(img, fit, rotDeg){
+    var t = fit.tight, pvx = t.x+t.w/2, pvy = t.y+t.h/2;
+    /* 沒旋轉時直接用tight box(預設置中就是拿它算的)——輪廓抽樣有解析度誤差，
+       拿來算會讓「預設置中」的商品差個1~2px，參考線顯示藍色而不是紅色。 */
+    if(!rotDeg) return { x0:t.x, y0:t.y, x1:t.x+t.w, y1:t.y+t.h, cx:pvx, cy:pvy };
+    var r = (rotDeg||0)*Math.PI/180, co = Math.cos(r), si = Math.sin(r);
+    var pts = Modules.product._outlinePts(img);
+    var x0=Infinity, y0=Infinity, x1=-Infinity, y1=-Infinity;
+    function add(px, py){
+      var dx = px-pvx, dy = py-pvy;
+      var X = pvx + dx*co - dy*si, Y = pvy + dx*si + dy*co;
+      if(X<x0)x0=X; if(X>x1)x1=X; if(Y<y0)y0=Y; if(Y>y1)y1=Y;
+    }
+    if(pts.length){
+      for(var i=0;i<pts.length;i++) add(fit.drawX + pts[i][0]*fit.drawW, fit.drawY + pts[i][1]*fit.drawH);
+    } else {
+      add(t.x, t.y); add(t.x+t.w, t.y); add(t.x, t.y+t.h); add(t.x+t.w, t.y+t.h);
+    }
+    return { x0:x0, y0:y0, x1:x1, y1:y1, cx:(x0+x1)/2, cy:(y0+y1)/2 };
   },
 
   /* 2026-09 改版：商品預設現在是「上下左右都置中」（之前只有水平置中，垂直
@@ -397,7 +467,7 @@ window.Modules.product = {
     return { x: cx+dx*Math.cos(rad)-dy*Math.sin(rad), y: cy+dx*Math.sin(rad)+dy*Math.cos(rad) };
   },
 
-  _buildInteractive: function(box, slot, cfg, scale, onRequestPick, onChange, onSelect){
+  _buildInteractive: function(box, slot, cfg, scale, onRequestPick, onChange, onSelect, isModal){
     if(!slot.productSrc){
       box.innerHTML = '<span class="ph">曝品（點擊上傳）</span>';
       box.onclick = function(){ if(onSelect) onSelect(); onRequestPick(); };
@@ -465,15 +535,35 @@ window.Modules.product = {
 
       if(!selected()) return;
 
+      // 對齊參考線(放大編輯視窗才有)：先畫，選取框/控制點畫在它上面
+      if(isModal){
+        var gb = Modules.product._rotatedBounds(img, fit, rot());
+        var P = Modules.product, eps = P.GUIDE_ALIGN_EPS;
+        var onX = Math.abs(gb.cx - boxW/2) < eps, onY = Math.abs(gb.cy - boxH/2) < eps;
+        ctx.save();
+        ctx.lineWidth = 1.5;
+        // 垂直基準線(穿過商品中心X)、水平基準線(穿過商品中心Y)，對齊時變紅實線
+        [[true, onX ? boxW/2 : gb.cx, onX], [false, onY ? boxH/2 : gb.cy, onY]].forEach(function(g){
+          ctx.beginPath();
+          if(g[0]){ ctx.moveTo(g[1], 0); ctx.lineTo(g[1], boxH); }
+          else    { ctx.moveTo(0, g[1]); ctx.lineTo(boxW, g[1]); }
+          ctx.setLineDash(g[2] ? [] : [6,4]);
+          ctx.strokeStyle = g[2] ? P.GUIDE_RED : P.GUIDE_BLUE;
+          ctx.stroke();
+        });
+        ctx.restore();
+      }
+
       var t = fit.tight;
       ctx.save();
       ctx.translate(pv.x, pv.y); ctx.rotate(rot()*Math.PI/180); ctx.translate(-pv.x, -pv.y);
 
-      ctx.strokeStyle = '#EE4D2D';
+      // 選取框：2026-10改成藍色實線(跟參考線同一個藍)，原本是橘色虛線；
+      // 旋轉中吸到45°倍數時變紅
+      ctx.strokeStyle = (drag && drag.mode === 'rotate' && drag.snapped) ? Modules.product.GUIDE_RED : Modules.product.GUIDE_BLUE;
       ctx.lineWidth = 1.5;
-      ctx.setLineDash([6,4]);
-      ctx.strokeRect(t.x, t.y, t.w, t.h);
       ctx.setLineDash([]);
+      ctx.strokeRect(t.x, t.y, t.w, t.h);
 
       // 旋轉把手：選取框正上方一小段連線
       var handleOffset = Math.max(18, boxH*0.08);
@@ -549,6 +639,11 @@ window.Modules.product = {
           redraw();
           if(onSelect) onSelect();
           if(onChange) onChange(); // logo是獨立畫布，讓外層整個重畫一次讓logo的選取外框也同步消失，理由同logo-module.js
+        } else if(slot.__lmSelected){
+          // 2026-10：點到商品區域的空白處(沒點到商品)，LOGO如果正被選取也要
+          // 取消——之前只有點LOGO自己附近才取消得掉。
+          slot.__lmSelected = false;
+          if(onChange) onChange();
         }
         return;
       }
@@ -607,6 +702,16 @@ window.Modules.product = {
         // 平移不受旋轉影響（不管商品轉幾度，往螢幕上的哪個方向拖，商品就往那個方向移動）
         slot.productOffsetX = drag.startOffX + (raw.x-drag.startX)/boxW;
         slot.productOffsetY = drag.startOffY + (raw.y-drag.startY)/boxH;
+        // 吸附到商品區域正中間(放大編輯視窗才有)。每次都從「沒吸附的原始位置」
+        // 算，拖遠一點就自然脫離，不會黏住。門檻用螢幕px換算回畫布邏輯px。
+        if(isModal && img){
+          var rectS = canvas.getBoundingClientRect();
+          var thr = Modules.product.GUIDE_SNAP_PX * (boxW / Math.max(1, rectS.width));
+          var sb = Modules.product._rotatedBounds(img, Modules.product._computeFit(img, boxW, boxH, slot, trim), rot());
+          var ddx = boxW/2 - sb.cx, ddy = boxH/2 - sb.cy;
+          if(Math.abs(ddx) <= thr) slot.productOffsetX += ddx/boxW;
+          if(Math.abs(ddy) <= thr) slot.productOffsetY += ddy/boxH;
+        }
 
       } else if(drag.mode === 'resize'){
         var local = rotate(raw.x, raw.y, drag.pivotAtStart.x, drag.pivotAtStart.y, -drag.rotAtStart);
@@ -631,6 +736,11 @@ window.Modules.product = {
       } else if(drag.mode === 'rotate'){
         var curAngle = Math.atan2(raw.y-drag.pivot.y, raw.x-drag.pivot.x)*180/Math.PI;
         slot.productRot = drag.startAngle + (curAngle-drag.startPointerAngle);
+        if(isModal){
+          var sa = Modules.product._snapAngle(slot.productRot);
+          slot.productRot = sa.deg;
+          drag.snapped = sa.snapped;
+        }
       }
       redraw();
     });

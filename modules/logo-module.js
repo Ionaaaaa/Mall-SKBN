@@ -255,12 +255,31 @@ window.Modules.logo = {
       return;
     }
 
+    // 對齊參考線/吸附只在放大編輯視窗啟用，判斷方式同product-module.js
+    var isModal = !!(el.classList && el.classList.contains('block-modal'));
     Modules.logo._detectLogoContent(slot, zone.w, zone.h, function(){
-      Modules.logo._buildInteractive(box, slot, zone, scale, onRequestPick, onChange, onSelect, onRequestLibraryPick);
+      Modules.logo._buildInteractive(box, slot, zone, scale, onRequestPick, onChange, onSelect, onRequestLibraryPick, isModal);
     }, Modules.logo._fitWRatio(zone));
   },
 
-  _buildInteractive: function(box, slot, zone, scale, onRequestPick, onChange, onSelect, onRequestLibraryPick){
+  /* ── 對齊參考線＋吸附（2026-10，只在放大編輯視窗）──────────────────
+     選取LOGO後：畫「LOGO自己的X/Y基準線」(穿過有色範圍中心的藍色虛線，跟著
+     LOGO移動)，中心對到LOGO範圍正中間時變紅色實線；有色範圍的左/右/上/下
+     剛好貼齊範圍邊緣時，該邊緣也畫一條紅色實線。拖曳移動時吸附LOGO範圍的
+     左/中/右、上/中/下(門檻GUIDE_SNAP_PX螢幕px)；縮放/方向鍵/滾輪不吸附。
+     顏色/門檻跟product-module.js共用同一組數字(Modules.product.GUIDE_*)。 */
+
+  /* LOGO有色範圍(不含透明留白)在zone本地座標裡的矩形。 */
+  _contentRect: function(img, fit, slot){
+    var s = fit.drawW / (img.width || 1);
+    var cw = (slot.__logoContentW || img.width) * s, ch = (slot.__logoContentH || img.height) * s;
+    var ccx = (slot.__logoContentCx != null) ? slot.__logoContentCx : img.width/2;
+    var ccy = (slot.__logoContentCy != null) ? slot.__logoContentCy : img.height/2;
+    var cx = fit.drawX + ccx*s, cy = fit.drawY + ccy*s;
+    return { x0:cx-cw/2, x1:cx+cw/2, y0:cy-ch/2, y1:cy+ch/2, cx:cx, cy:cy };
+  },
+
+  _buildInteractive: function(box, slot, zone, scale, onRequestPick, onChange, onSelect, onRequestLibraryPick, isModal){
     var boxW = zone.w*scale, boxH = zone.h*scale;
     var canvas = document.createElement('canvas');
     var dpr = window.devicePixelRatio || 1;
@@ -305,10 +324,36 @@ window.Modules.logo = {
 
       if(!selected() || !lastFit) return;
       var fit = lastFit;
+
+      // 對齊參考線(放大編輯視窗才有)：先畫，選取框/控制點畫在它上面
+      if(isModal && img){
+        var P = Modules.product, eps = P.GUIDE_ALIGN_EPS, cr = Modules.logo._contentRect(img, fit, slot);
+        var onX = Math.abs(cr.cx - boxW/2) < eps, onY = Math.abs(cr.cy - boxH/2) < eps;
+        var lines = [
+          { v:true,  p: onX ? boxW/2 : cr.cx, red:onX },
+          { v:false, p: onY ? boxH/2 : cr.cy, red:onY }
+        ];
+        // 貼齊範圍邊緣：畫在邊緣往內0.75px，線才不會有一半被canvas邊界切掉
+        if(Math.abs(cr.x0) < eps)        lines.push({ v:true,  p:0.75,      red:true });
+        if(Math.abs(cr.x1 - boxW) < eps) lines.push({ v:true,  p:boxW-0.75, red:true });
+        if(Math.abs(cr.y0) < eps)        lines.push({ v:false, p:0.75,      red:true });
+        if(Math.abs(cr.y1 - boxH) < eps) lines.push({ v:false, p:boxH-0.75, red:true });
+        ctx.save();
+        ctx.lineWidth = 1.5;
+        lines.forEach(function(g){
+          ctx.beginPath();
+          if(g.v){ ctx.moveTo(g.p, 0); ctx.lineTo(g.p, boxH); } else { ctx.moveTo(0, g.p); ctx.lineTo(boxW, g.p); }
+          ctx.setLineDash(g.red ? [] : [6,4]);
+          ctx.strokeStyle = g.red ? P.GUIDE_RED : P.GUIDE_BLUE;
+          ctx.stroke();
+        });
+        ctx.restore();
+      }
+
+      // 選取框：2026-10改成藍色實線(跟參考線同一個藍)，原本是橘色虛線
       ctx.save();
-      ctx.strokeStyle = '#EE4D2D';
+      ctx.strokeStyle = Modules.product.GUIDE_BLUE;
       ctx.lineWidth = 1.5;
-      ctx.setLineDash([5,3]);
       ctx.strokeRect(fit.drawX, fit.drawY, fit.drawW, fit.drawH);
       ctx.restore();
 
@@ -367,6 +412,15 @@ window.Modules.logo = {
       var p = pointerPos(e);
 
       if(!selected()){
+        /* 2026-10：要點到LOGO本身才選取(白膠囊模式點膠囊任一處都算)——之前
+           點LOGO範圍裡任何空白處都會選到，掛標關閉範圍放寬到269之後，點LOGO
+           旁邊一大片空白也會被選取。沒點到時，商品如果正被選取就順便取消。 */
+        var hit = (slot.logoMode === 'trim') ||
+          (p.x>=lastFit.drawX && p.x<=lastFit.drawX+lastFit.drawW && p.y>=lastFit.drawY && p.y<=lastFit.drawY+lastFit.drawH);
+        if(!hit){
+          if(slot.__pmSelected){ slot.__pmSelected = false; if(onChange) onChange(); }
+          return;
+        }
         slot.__lmSelected = true;
         slot.__pmSelected = false; // 換選logo，商品圖那邊的選取狀態要跟著清掉，不然商品圖會卡在「已選取」，之後點商品圖不會再觸發onSelect，畫面看起來像沒反應(這是你反映的bug)
         redraw();
@@ -407,6 +461,23 @@ window.Modules.logo = {
       if(drag.mode === 'move'){
         slot.logoOffsetX = drag.startOffX + (p.x-drag.startX)/boxW;
         slot.logoOffsetY = drag.startOffY + (p.y-drag.startY)/boxH;
+        // 吸附LOGO範圍的左/中/右、上/中/下(放大編輯視窗才有)。每次都從「沒吸附
+        // 的原始位置」算，拖遠一點就自然脫離。各軸挑門檻內最近的一組。
+        if(isModal && img){
+          var rectS = canvas.getBoundingClientRect();
+          var thr = Modules.product.GUIDE_SNAP_PX * (boxW / Math.max(1, rectS.width));
+          var useClamp = (slot.logoMode === 'trim') ? false : clamp;
+          var cr = Modules.logo._contentRect(img, Modules.logo._computeLogoFit(img, boxW, boxH, slot, fitWRatio, useClamp), slot);
+          var best = function(pts, targets){
+            var b = null;
+            pts.forEach(function(pv){ targets.forEach(function(t){ var d = t-pv; if(Math.abs(d) <= thr && (!b || Math.abs(d) < Math.abs(b))) b = d; }); });
+            return b;
+          };
+          var sx = best([cr.x0, cr.cx, cr.x1], [0, boxW/2, boxW]);
+          var sy = best([cr.y0, cr.cy, cr.y1], [0, boxH/2, boxH]);
+          if(sx !== null) slot.logoOffsetX += sx/boxW;
+          if(sy !== null) slot.logoOffsetY += sy/boxH;
+        }
       } else if(drag.mode === 'resize'){
         var scaleFromW = (p.x-drag.anchorX) / drag.unitHalfW;
         var scaleFromH = (p.y-drag.anchorY) / drag.unitHalfH;

@@ -1885,6 +1885,18 @@ function initGlobalDeselect(){
     // 點色盤要選色時，這裡的renderAll()會把色盤所在的input元素整個砍掉
     // 重建，瀏覽器原生色盤的錨點消失就會自動關閉，變成「一點下去就關掉」。
     if(e.target && e.target.closest && e.target.closest('.product-zone, .logo-zone, input, select, button, .swatch')) return;
+    /* 2026-10：放大編輯視窗裡的商品/LOGO是另一份草稿slot(_modalCtx.slot)，
+       下面那段只清主畫面STATE.banners，清不到它——所以之前在放大編輯視窗
+       點主標、CTA、背景這些地方都取消不了選取。這裡補上：點在放大編輯
+       視窗的畫布區(#modal-stage-inner)裡、但不是商品/LOGO本身，就取消選取。
+       左右兩側的設定面板不算(點面板文字不該讓選取消失，工具列會跟著變)。 */
+    if(_modalCtx && e.target && e.target.closest && e.target.closest('#modal-stage-inner')){
+      var ms = _modalCtx.slot;
+      if(ms.__pmSelected || ms.__lmSelected){
+        ms.__pmSelected = false; ms.__lmSelected = false;
+        refreshModalStage();
+      }
+    }
     var changed = [];
     STATE.banners.forEach(function(banner){
       Core.SLOT_KEYS.forEach(function(key){
