@@ -523,7 +523,9 @@ window.Modules.product = {
            groundAnchorX/Y(商品沒加位移的原始接地位置)給shadow-plugin.js，
            它會專門拿這組值去算接地陰影的位置，x/y(shx/shy，已經加了位移)還是
            照舊給主陰影/柔霧用。 */
-        ShadowPlugin.renderScene(ctx, [{ id:registeredId, x:shx, y:shy, w:fit.w, h:fit.h, groundAnchorX: shadowCx, groundAnchorY: fit.groundY, refW: fit.refW, refH: fit.refH }], true);
+        // 2026-10：把旋轉角度＋旋轉樞紐(跟下面畫照片用的同一個：有色範圍中心)
+        // 一起傳給ShadowPlugin，有旋轉時它會用「旋轉後的商品」重算影子(代理圖)。
+        ShadowPlugin.renderScene(ctx, [{ id:registeredId, x:shx, y:shy, w:fit.w, h:fit.h, groundAnchorX: shadowCx, groundAnchorY: fit.groundY, refW: fit.refW, refH: fit.refH, rot: rot(), pivotX: pv.x, pivotY: pv.y }], true);
       }
 
       // 商品照片＋券樣文字：繞著選取框中心旋轉（陰影不轉，維持貼地）
@@ -782,7 +784,9 @@ window.Modules.product = {
           var shy = absAnchorY + (slot.shadowOffsetY||0)*z.h;
           // 跟redraw()那邊同一個道理：接地陰影固定用absAnchorX/Y(沒加位移)，
           // 主陰影/柔霧才吃shx/shy(加了位移)。
-          ShadowPlugin.renderScene(ctx, [{ id:id, x:shx, y:shy, w:fit.w, h:fit.h, groundAnchorX: absAnchorX, groundAnchorY: absAnchorY, refW: fit.refW, refH: fit.refH }], true);
+          // 旋轉角度/樞紐跟redraw()同一套(有色範圍中心)，匯出的影子才會跟預覽一致
+          var et = fit.tight;
+          ShadowPlugin.renderScene(ctx, [{ id:id, x:shx, y:shy, w:fit.w, h:fit.h, groundAnchorX: absAnchorX, groundAnchorY: absAnchorY, refW: fit.refW, refH: fit.refH, rot: slot.productRot||0, pivotX: lx+et.x+et.w/2, pivotY: ly+et.y+et.h/2 }], true);
         }
 
         var t = fit.tight;

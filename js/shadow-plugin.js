@@ -110,7 +110,8 @@ window.ShadowPlugin = (function () {
 
   function buildSilhouette(img) {
     var c = document.createElement('canvas');
-    c.width = img.naturalWidth; c.height = img.naturalHeight;
+    // naturalWidth給<img>用；旋轉代理圖是canvas，沒有naturalWidth，退回width
+    c.width = img.naturalWidth || img.width; c.height = img.naturalHeight || img.height;
     var ctx = c.getContext('2d');
     ctx.drawImage(img, 0, 0);
     ctx.globalCompositeOperation = 'source-in';
@@ -178,9 +179,10 @@ window.ShadowPlugin = (function () {
   function detectAlphaTrim(img) {
     var c = document.createElement('canvas');
     var maxDim = 300;
-    var scale = Math.min(1, maxDim / Math.max(img.naturalWidth, img.naturalHeight));
-    var w = Math.max(1, Math.round(img.naturalWidth * scale));
-    var h = Math.max(1, Math.round(img.naturalHeight * scale));
+    var iw = img.naturalWidth || img.width, ih = img.naturalHeight || img.height; // 同buildSilhouette，代理圖是canvas
+    var scale = Math.min(1, maxDim / Math.max(iw, ih));
+    var w = Math.max(1, Math.round(iw * scale));
+    var h = Math.max(1, Math.round(ih * scale));
     c.width = w; c.height = h;
     var cctx = c.getContext('2d');
     cctx.drawImage(img, 0, 0, w, h);
@@ -296,8 +298,9 @@ window.ShadowPlugin = (function () {
   }
 
   // ---- 商品：貼地陰影（原本效果，參數已固定） ----
-  function drawGroundShadow(ctx, id, state, occluderMask, skipPhoto) {
-    var p = products[id];
+  // pOverride：旋轉代理圖(見drawRotatedShadow)直接把代理圖的商品資料傳進來，不走products[id]
+  function drawGroundShadow(ctx, id, state, occluderMask, skipPhoto, pOverride) {
+    var p = pOverride || products[id];
     if (!p || !p.silhouette) return;
 
     var pw = state.w, ph = state.h;
@@ -318,7 +321,12 @@ window.ShadowPlugin = (function () {
        原圖的中心，會跟商品視覺上的真正中心對不齊，讓斜切看起來像整個偏移，不只是
        刻意的斜切角度而已。這裡用 trim.left/trim.right 算出偏移量，只套用在
        shadowCx（下面畫影子用），pivotX／cx（商品照片、旋轉樞紐）維持原樣。 */
-    var trimCenterOffsetX = p.trim ? (p.trim.left - p.trim.right) * pw / 2 : 0;
+    /* ⚠ 2026-10拿掉(變數保留，固定0)：state.x本來就是「整張PNG(含留白)」的中心，
+       下面主陰影蓋印也是拿整張PNG輪廓、以shadowCx為中心去蓋，兩者本來就對齊；
+       再加這個修正等於把左右留白差又補一次，主陰影根部反而偏掉
+       (植村秀左留白36%/右10.7%實測偏約24px)。其他專案(personal-event等)
+       2026-10也是同樣處理。 */
+    var trimCenterOffsetX = 0;
     var shadowCx = cx + trimCenterOffsetX;
 
     /* 2026-07-28 跟 Iona 確認新增：陰影不跟著商品旋轉。
@@ -452,6 +460,12 @@ window.ShadowPlugin = (function () {
     var occludeStrength = FIXED.occlude / 100;
     var shear = Math.tan(angle * 0.55);
     var maxSpread = soft * 1.8;
+    /* 2026-10修正：主陰影是拿整張PNG(含底部透明留白)去斜切，斜切支點在PNG
+       最底邊，但真正碰地的線在支點往上「底部留白」那麼高的地方，會被斜切
+       往旁邊推開 shear×底部留白 那麼多(左光源往右偏、右光源往左偏，留白越多
+       偏越多；旋轉後的代理圖底部留白會變多，更明顯)。上下方向本來就有補
+       (留白×squash)，這裡補左右方向。留白用主陰影實際蓋印的高度sph算。 */
+    shadowCx += shear * (p.trim ? p.trim.bottom * sph : 0);
 
     /* 2026-08 光源角度選「中」（光源正上方、angle=0、完全沒有斜切）時，只要
        接地補強陰影那一小條就好，不要再疊主斜切陰影——主斜切陰影在angle=0時
@@ -634,9 +648,82 @@ window.ShadowPlugin = (function () {
     });
   }
 
+  /* ---- 2026-10：旋轉後影子跟著轉（代理圖做法）----
+     參考personal-event等專案的getRotatedProxy()：先把商品照目前角度轉好，
+     畫進一張外接矩形大小的暫存圖(代理圖)，重做它的黑色輪廓＋透明留白，
+     再把代理圖當成「沒旋轉的商品」交給原本的drawGroundShadow()——碰地線
+     自動變成旋轉後輪廓的最低點，接地陰影、主斜切、柔邊、淡出全部照舊。
+     商品照片本身不用代理圖(呼叫端自己用原圖+ctx.rotate畫，畫質不會變糊)。
+     旋轉樞紐：呼叫端要傳state.pivotX/pivotY，跟它畫照片用的樞紐一致
+     (SKBN的product-module.js是有色範圍中心)；沒傳就用(x, y-h/2)。
+     ROTATED_SHADOW改成false會退回舊行為(影子不跟著轉、接地陰影不畫)。 */
+  var ROTATED_SHADOW = true;
+  var ROT_PROXY_MAX = 900; // 代理圖最長邊上限，影子本來就是模糊的，不需要原圖那麼大
+
+  function getRotatedProxy(p, w, h, rotDeg) {
+    var r = rotDeg * Math.PI / 180, co = Math.abs(Math.cos(r)), si = Math.abs(Math.sin(r));
+    var bw = w * co + h * si, bh = w * si + h * co;
+    var k = Math.min(1, ROT_PROXY_MAX / Math.max(bw, bh));
+    var key = (Math.round(rotDeg * 10) / 10) + '|' + Math.round(bw * k) + '|' + Math.round(bh * k);
+    if (p._rotProxy && p._rotProxy.key === key) return p._rotProxy;
+    var cw = Math.max(1, Math.round(bw * k)), ch = Math.max(1, Math.round(bh * k));
+    var c = document.createElement('canvas'); c.width = cw; c.height = ch;
+    var cx = c.getContext('2d');
+    cx.imageSmoothingEnabled = true; cx.imageSmoothingQuality = 'high';
+    cx.translate(cw / 2, ch / 2); cx.rotate(r);
+    cx.drawImage(p.img, -w * k / 2, -h * k / 2, w * k, h * k);
+    // 代理圖自己的商品資料：輪廓/留白重算；上色、主陰影、接地陰影快取都掛在它身上，
+    // 同一個角度/大小再畫就直接沿用
+    p._rotProxy = { key: key, bw: bw, bh: bh, img: c, silhouette: buildSilhouette(c), trim: detectAlphaTrim(c), tinted: null, type: 'product' };
+    return p._rotProxy;
+  }
+
+  function drawRotatedShadow(ctx, id, state, occluderMask) {
+    var p = products[id];
+    if (!p || !p.silhouette || !p.img) return;
+    var w = state.w, h = state.h, rot = state.rot;
+    var pad = p.trim ? p.trim.bottom * h : 0;
+    // 沒加陰影位移的原始位置(接地陰影用)，跟加了位移的差(主陰影用)
+    var ax = (state.groundAnchorX != null) ? state.groundAnchorX : state.x;
+    var ay = (state.groundAnchorY != null) ? state.groundAnchorY : state.y;
+    var offX = state.x - ax, offY = state.y - ay;
+    // 整張圖中心(沒旋轉時)，繞樞紐轉到旋轉後的位置
+    var icx = ax, icy = ay + pad - h / 2;
+    var pvx = (state.pivotX != null) ? state.pivotX : ax;
+    var pvy = (state.pivotY != null) ? state.pivotY : (ay - h / 2);
+    var r = rot * Math.PI / 180, co = Math.cos(r), si = Math.sin(r);
+    var dx = icx - pvx, dy = icy - pvy;
+    var crx = pvx + dx * co - dy * si, cry = pvy + dx * si + dy * co;
+
+    var px = getRotatedProxy(p, w, h, rot);
+    var ground2 = cry + px.bh / 2 - px.trim.bottom * px.bh; // 旋轉後輪廓真正碰地的那條線
+    var st2 = {
+      x: crx + offX, y: ground2 + offY, w: px.bw, h: px.bh, rot: 0,
+      groundAnchorX: crx, groundAnchorY: ground2,
+      shadowScaleX: state.shadowScaleX, shadowScaleY: state.shadowScaleY
+    };
+    drawGroundShadow(ctx, id, st2, occluderMask, true, px);
+  }
+
   function drawItem(ctx, id, state, occluderMask, skipPhoto) {
     var type = getType(id);
     if (type === 'person') drawPersonGlow(ctx, id, state, occluderMask, skipPhoto);
+    else if (ROTATED_SHADOW && state.rot) {
+      drawRotatedShadow(ctx, id, state, occluderMask);
+      if (!skipPhoto) {
+        var p = products[id];
+        if (p && p.img && p.img.complete && p.img.naturalWidth) {
+          var pad = p.trim ? p.trim.bottom * state.h : 0;
+          var ax = (state.groundAnchorX != null) ? state.groundAnchorX : state.x;
+          var ay = (state.groundAnchorY != null) ? state.groundAnchorY : state.y;
+          var pvx = (state.pivotX != null) ? state.pivotX : ax;
+          var pvy = (state.pivotY != null) ? state.pivotY : (ay - state.h / 2);
+          withRotation(ctx, pvx, pvy, state.rot, function () {
+            ctx.drawImage(p.img, ax - state.w / 2, ay + pad - state.h, state.w, state.h);
+          });
+        }
+      }
+    }
     else drawGroundShadow(ctx, id, state, occluderMask, skipPhoto);
   }
 
