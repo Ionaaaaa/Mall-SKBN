@@ -132,6 +132,12 @@ function parseWorkOrder(rows){
 }
 
 function handleExcelFile(file, onSuccess, onFail){
+  // 2026-10：選頁籤＋比對確認（LOGO/商品圖對不到時先讓你選圖），見js/import-review.js。
+  // 沒載入那支檔案、或是導覽用的範例工單，照下面原本的流程（讀第一個頁籤）。
+  if(typeof ImportReview !== 'undefined' && ImportReview.wants(file)){
+    ImportReview.handleExcel(file, onSuccess, onFail);
+    return;
+  }
   var reader = new FileReader();
   reader.onload = function(evt){
     try{
